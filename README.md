@@ -1,15 +1,17 @@
-# DeepSeek Chat Application
+# AI Chat Application
 
-A modern chat application built with React and TypeScript that uses the DeepSeek API for AI-powered conversations.
+A modern, extensible chat application built with React and TypeScript that supports multiple AI providers including DeepSeek and Claude (Anthropic). Features a clean architecture following SOLID principles and design patterns.
 
 ## Features
 
-- Real-time streaming responses from DeepSeek AI
-- Clean, modern UI with Tailwind CSS
-- Markdown support for formatted responses
-- Message history management
-- TypeScript for type safety
-- Responsive design
+- **Multiple AI Providers**: Support for DeepSeek and Claude (Anthropic) with easy extensibility
+- **Real-time Streaming**: Streaming responses from AI providers
+- **Clean Architecture**: SOLID principles, Strategy pattern, Dependency Injection
+- **Modern UI**: Clean, responsive design with Tailwind CSS
+- **Markdown Support**: Formatted AI responses with React Markdown
+- **Type Safety**: Full TypeScript coverage with runtime validation (Zod)
+- **Error Handling**: Comprehensive error handling and validation
+- **Composable Components**: Well-structured React components with custom hooks
 
 ## Tech Stack
 
@@ -21,17 +23,21 @@ A modern chat application built with React and TypeScript that uses the DeepSeek
 - React Markdown (message formatting)
 
 ### Backend
-- Node.js
-- Express
+- Node.js & Express
 - TypeScript
-- OpenAI SDK (DeepSeek API)
+- Multiple AI SDKs:
+  - Anthropic SDK (Claude)
+  - OpenAI SDK (DeepSeek)
+- Zod (validation)
 - CORS support
 
 ## Prerequisites
 
 - Node.js (v18 or higher recommended)
 - npm or yarn
-- DeepSeek API key ([get one here](https://platform.deepseek.com/))
+- API key for your chosen AI provider:
+  - DeepSeek API key: [Get one here](https://platform.deepseek.com/)
+  - Claude API key: [Get one here](https://console.anthropic.com/)
 
 ## Installation
 
@@ -54,8 +60,27 @@ npm install
 # Create environment file
 cp .env.example .env
 
-# Edit .env and add your DeepSeek API key
-# DEEPSEEK_API_KEY=your_api_key_here
+# Edit .env and configure your AI provider
+# Choose either DeepSeek or Claude (or configure both)
+```
+
+**Environment Variables** (`.env`):
+```bash
+# AI Provider Selection
+AI_PROVIDER=claude  # Options: 'deepseek' or 'claude'
+
+# DeepSeek Configuration (if using DeepSeek)
+DEEPSEEK_API_KEY=your_deepseek_api_key
+DEEPSEEK_MODEL=deepseek-chat
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+
+# Claude Configuration (if using Claude)
+CLAUDE_API_KEY=your_claude_api_key
+CLAUDE_MODEL=claude-3-5-sonnet-20241022
+CLAUDE_MAX_TOKENS=4096
+
+# Server Configuration
+PORT=3001
 ```
 
 ### 3. Frontend Setup
@@ -98,44 +123,53 @@ The frontend will start on http://localhost:5173 (or another port if 5173 is bus
 1. Open your browser and navigate to the frontend URL (typically http://localhost:5173)
 2. Type your message in the input field
 3. Press Enter or click Send
-4. Watch as DeepSeek responds in real-time with streaming!
+4. Watch as the AI responds in real-time with streaming!
 
 ## Configuration
 
+### Switching AI Providers
+
+To switch between AI providers, simply change the `AI_PROVIDER` value in your backend `.env` file:
+
+```bash
+# Use Claude
+AI_PROVIDER=claude
+
+# Or use DeepSeek
+AI_PROVIDER=deepseek
+```
+
+Then restart your backend server. The application architecture uses the Strategy Pattern, making provider switching seamless.
+
 ### Backend Environment Variables
 
-- `DEEPSEEK_API_KEY` - Your DeepSeek API key (required)
+**Core Settings:**
+- `AI_PROVIDER` - Which AI provider to use: `deepseek` or `claude`
 - `PORT` - Server port (default: 3001)
+
+**DeepSeek Settings:**
+- `DEEPSEEK_API_KEY` - Your DeepSeek API key
+- `DEEPSEEK_MODEL` - Model to use (default: deepseek-chat)
+- `DEEPSEEK_BASE_URL` - API base URL (default: https://api.deepseek.com)
+
+**Claude Settings:**
+- `CLAUDE_API_KEY` - Your Claude API key
+- `CLAUDE_MODEL` - Model to use (default: claude-3-5-sonnet-20241022)
+- `CLAUDE_MAX_TOKENS` - Max response tokens (default: 4096)
 
 ### Frontend Environment Variables
 
 - `VITE_API_URL` - Backend API URL (default: http://localhost:3001)
 
-## Project Structure
+### Adding a New AI Provider
 
-```
-chat/
-├── backend/
-│   ├── src/
-│   │   └── server.ts          # Express server with DeepSeek API integration
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── .env.example
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   └── Chat.tsx       # Main chat component
-│   │   ├── api.ts             # API client for backend
-│   │   ├── types.ts           # TypeScript types
-│   │   ├── App.tsx
-│   │   ├── main.tsx
-│   │   └── index.css
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── tailwind.config.js
-│   └── .env.example
-└── README.md
-```
+Thanks to the Strategy Pattern and Open/Closed Principle, adding a new provider is easy:
+
+1. Create a new service implementing `IAIProvider` interface
+2. Add configuration in `app.config.ts`
+3. Update the factory in `server.ts`
+
+No existing code needs modification! See `backend/ARCHITECTURE.md` for details.
 
 ## Building for Production
 
@@ -161,15 +195,27 @@ The built files will be in the `frontend/dist` directory.
 
 ### "API key not found" error
 - Make sure you've created a `.env` file in the backend folder
-- Verify your API key is correct and properly set in the `.env` file
+- Verify your API key for your chosen provider is correct
+- Check that `AI_PROVIDER` matches the provider whose key you've set
 
 ### CORS errors
 - Ensure the backend is running on port 3001
 - Check that the frontend's `VITE_API_URL` matches your backend URL
+- Verify the backend CORS configuration
 
 ### Port already in use
-- Change the port in backend's `.env` file
+- Change the `PORT` in backend's `.env` file
 - Update `VITE_API_URL` in frontend's `.env` to match
+
+### Provider switching not working
+- Restart the backend server after changing `AI_PROVIDER`
+- Ensure the new provider's API key is configured
+- Check backend logs for provider initialization messages
+
+### Stream not displaying
+- Check browser console for errors
+- Verify the backend is running and accessible
+- Ensure your API key has sufficient credits/quota
 
 ## License
 
