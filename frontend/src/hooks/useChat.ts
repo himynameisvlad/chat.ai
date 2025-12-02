@@ -60,6 +60,7 @@ export function useChat(): UseChatReturn {
         const assistantMessage: Message = {
           role: 'assistant',
           content: '',
+          expectsFormatted: useSystemPrompt,
         };
 
         // Return updated messages with both user and assistant messages
@@ -73,15 +74,26 @@ export function useChat(): UseChatReturn {
           (chunk) => {
             setMessages((prev) => {
               const updated = [...prev];
-              const lastMessage = updated[updated.length - 1];
+              const lastIndex = updated.length - 1;
+              const lastMessage = updated[lastIndex];
+
               if (lastMessage.role === 'assistant') {
-                lastMessage.content += chunk;
+                const newContent = lastMessage.content + chunk;
 
                 // Try to parse as formatted response after each chunk
-                const formattedContent = tryParseFormattedResponse(lastMessage.content);
+                const formattedContent = tryParseFormattedResponse(newContent);
+
                 if (formattedContent) {
-                  lastMessage.formattedContent = formattedContent;
+                  console.log('✅ JSON parsed successfully:', formattedContent);
                 }
+
+                // Create new message object to trigger React update
+                updated[lastIndex] = {
+                  ...lastMessage,
+                  content: newContent,
+                  // Keep previous formattedContent if parsing fails, update if succeeds
+                  formattedContent: formattedContent || lastMessage.formattedContent,
+                };
               }
               return updated;
             });
