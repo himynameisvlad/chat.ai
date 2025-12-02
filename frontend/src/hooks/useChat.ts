@@ -2,27 +2,21 @@ import { useState, useCallback } from 'react';
 import { type Message } from '../types';
 import { chatService, ChatServiceError } from '../services/chat.service';
 
-/**
- * Return type for the useChat hook
- */
 interface UseChatReturn {
   messages: Message[];
   isLoading: boolean;
   error: string | null;
+  useSystemPrompt: boolean;
+  setUseSystemPrompt: (value: boolean) => void;
   sendMessage: (message: string) => Promise<void>;
   clearError: () => void;
 }
 
-/**
- * Custom hook for managing chat state and logic
- * Follows Container/Presenter pattern - handles all business logic
- *
- * @returns Chat state and methods
- */
 export function useChat(): UseChatReturn {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useSystemPrompt, setUseSystemPrompt] = useState(false);
 
   /**
    * Sends a message to the chat API
@@ -58,22 +52,20 @@ export function useChat(): UseChatReturn {
       });
 
       try {
-        console.log('sendMessage');
         await chatService.sendMessage(
           conversationHistory, // Use captured history
           message.trim(),
           (chunk) => {
-            console.log(chunk);
             setMessages((prev) => {
               const updated = [...prev];
-              console.log('updated', updated);
               const lastMessage = updated[updated.length - 1];
               if (lastMessage.role === 'assistant') {
                 lastMessage.content += chunk;
               }
               return updated;
             });
-          }
+          },
+          useSystemPrompt
         );
       } catch (err) {
         const errorMessage =
@@ -99,7 +91,7 @@ export function useChat(): UseChatReturn {
         setIsLoading(false);
       }
     },
-    [isLoading]
+    [isLoading, useSystemPrompt]
   );
 
   /**
@@ -113,6 +105,8 @@ export function useChat(): UseChatReturn {
     messages,
     isLoading,
     error,
+    useSystemPrompt,
+    setUseSystemPrompt,
     sendMessage,
     clearError,
   };

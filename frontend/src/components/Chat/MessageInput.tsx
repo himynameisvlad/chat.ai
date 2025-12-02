@@ -1,19 +1,13 @@
 import { useState, useRef, type KeyboardEvent, type FormEvent } from 'react';
 
-/**
- * Props for the MessageInput component
- */
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
   isLoading: boolean;
+  useSystemPrompt: boolean;
+  onToggleSystemPrompt: (value: boolean) => void;
 }
 
-/**
- * MessageInput Component
- * Handles user input and message submission
- * Follows Single Responsibility Principle - only handles input
- */
-export function MessageInput({ onSendMessage, isLoading }: MessageInputProps) {
+export function MessageInput({ onSendMessage, isLoading, useSystemPrompt, onToggleSystemPrompt }: MessageInputProps) {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -61,6 +55,22 @@ export function MessageInput({ onSendMessage, isLoading }: MessageInputProps) {
           >
             {isLoading ? 'Sending...' : 'Send'}
           </button>
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="useSystemPrompt"
+            checked={useSystemPrompt}
+            onChange={(e) => onToggleSystemPrompt(e.target.checked)}
+            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+            disabled={isLoading}
+          />
+          <label
+            htmlFor="useSystemPrompt"
+            className="text-sm text-gray-700 cursor-pointer select-none"
+          >
+            Formatted
+          </label>
         </div>
       </form>
     </div>
