@@ -1,6 +1,21 @@
 import { useState, useCallback } from 'react';
-import { type Message } from '../types';
+import { type Message, type FormattedResponse } from '../types';
 import { chatService, ChatServiceError } from '../services/chat.service';
+
+/**
+ * Attempts to parse content as JSON formatted response
+ */
+function tryParseFormattedResponse(content: string): FormattedResponse | null {
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed.text && parsed.source && Array.isArray(parsed.tags)) {
+      return parsed as FormattedResponse;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 interface UseChatReturn {
   messages: Message[];
@@ -61,6 +76,12 @@ export function useChat(): UseChatReturn {
               const lastMessage = updated[updated.length - 1];
               if (lastMessage.role === 'assistant') {
                 lastMessage.content += chunk;
+
+                // Try to parse as formatted response after each chunk
+                const formattedContent = tryParseFormattedResponse(lastMessage.content);
+                if (formattedContent) {
+                  lastMessage.formattedContent = formattedContent;
+                }
               }
               return updated;
             });
