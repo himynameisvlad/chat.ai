@@ -8,6 +8,7 @@ export interface Message {
 export interface ChatRequest {
   messages: Message[];
   message: string;
+  useSystemPrompt?: boolean;
 }
 
 export interface StreamChunk {
