@@ -1,5 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import { type Message as MessageType } from '../../types';
+import { FormattedResponseView } from './FormattedResponseView';
+import { LoadingIndicator } from './LoadingIndicator';
 
 /**
  * Props for the Message component
@@ -13,6 +15,7 @@ interface MessageProps {
  * Displays a single chat message (user or assistant)
  * Follows Single Responsibility Principle - only renders a message
  */
+
 export function Message({ message }: MessageProps) {
   const isUser = message.role === 'user';
 
@@ -27,6 +30,10 @@ export function Message({ message }: MessageProps) {
       >
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
+        ) : message.expectsFormatted && !message.formattedContent ? (
+          <LoadingIndicator />
+        ) : message.formattedContent ? (
+          <FormattedResponseView data={message.formattedContent} />
         ) : (
           <div className="prose prose-sm max-w-none">
             <ReactMarkdown>{message.content || '...'}</ReactMarkdown>

@@ -1,28 +1,37 @@
 import { useState, useCallback } from 'react';
-import { type Message } from '../types';
+import { type Message, type FormattedResponse } from '../types';
 import { chatService, ChatServiceError } from '../services/chat.service';
 
 /**
- * Return type for the useChat hook
+ * Attempts to parse content as JSON formatted response
  */
+function tryParseFormattedResponse(content: string): FormattedResponse | null {
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed.text && parsed.source && Array.isArray(parsed.tags)) {
+      return parsed as FormattedResponse;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 interface UseChatReturn {
   messages: Message[];
   isLoading: boolean;
   error: string | null;
+  useSystemPrompt: boolean;
+  setUseSystemPrompt: (value: boolean) => void;
   sendMessage: (message: string) => Promise<void>;
   clearError: () => void;
 }
 
-/**
- * Custom hook for managing chat state and logic
- * Follows Container/Presenter pattern - handles all business logic
- *
- * @returns Chat state and methods
- */
 export function useChat(): UseChatReturn {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useSystemPrompt, setUseSystemPrompt] = useState(false);
 
   /**
    * Sends a message to the chat API
@@ -51,6 +60,7 @@ export function useChat(): UseChatReturn {
         const assistantMessage: Message = {
           role: 'assistant',
           content: '',
+          expectsFormatted: useSystemPrompt,
         };
 
         // Return updated messages with both user and assistant messages
@@ -58,22 +68,37 @@ export function useChat(): UseChatReturn {
       });
 
       try {
-        console.log('sendMessage');
         await chatService.sendMessage(
           conversationHistory, // Use captured history
           message.trim(),
           (chunk) => {
-            console.log(chunk);
             setMessages((prev) => {
               const updated = [...prev];
-              console.log('updated', updated);
-              const lastMessage = updated[updated.length - 1];
+              const lastIndex = updated.length - 1;
+              const lastMessage = updated[lastIndex];
+
               if (lastMessage.role === 'assistant') {
-                lastMessage.content += chunk;
+                const newContent = lastMessage.content + chunk;
+
+                // Try to parse as formatted response after each chunk
+                const formattedContent = tryParseFormattedResponse(newContent);
+
+                if (formattedContent) {
+                  console.log('✅ JSON parsed successfully:', formattedContent);
+                }
+
+                // Create new message object to trigger React update
+                updated[lastIndex] = {
+                  ...lastMessage,
+                  content: newContent,
+                  // Keep previous formattedContent if parsing fails, update if succeeds
+                  formattedContent: formattedContent || lastMessage.formattedContent,
+                };
               }
               return updated;
             });
-          }
+          },
+          useSystemPrompt
         );
       } catch (err) {
         const errorMessage =
@@ -99,7 +124,7 @@ export function useChat(): UseChatReturn {
         setIsLoading(false);
       }
     },
-    [isLoading]
+    [isLoading, useSystemPrompt]
   );
 
   /**
@@ -113,6 +138,8 @@ export function useChat(): UseChatReturn {
     messages,
     isLoading,
     error,
+    useSystemPrompt,
+    setUseSystemPrompt,
     sendMessage,
     clearError,
   };

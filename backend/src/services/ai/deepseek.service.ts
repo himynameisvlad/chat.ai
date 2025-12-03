@@ -24,14 +24,24 @@ export class DeepSeekService implements IAIProvider {
     this.model = config.model;
   }
 
-  async streamChat(messages: Message[], response: StreamResponse): Promise<void> {
+  async streamChat(messages: Message[], response: StreamResponse, useSystemPrompt?: boolean): Promise<void> {
     try {
       // Set headers for Server-Sent Events (SSE)
       this.setStreamHeaders(response);
 
+      // Add system prompt if requested
+      let messagesToSend = messages;
+      if (useSystemPrompt) {
+        const systemMessage: Message = {
+          role: 'system',
+          content: this.getSystemPrompt(),
+        };
+        messagesToSend = [systemMessage, ...messages];
+      }
+
       // Convert messages to OpenAI format
       const formattedMessages: OpenAI.Chat.ChatCompletionMessageParam[] =
-        messages.map((msg) => ({
+        messagesToSend.map((msg) => ({
           role: msg.role as 'user' | 'assistant' | 'system',
           content: msg.content,
         }));
@@ -97,5 +107,23 @@ export class DeepSeekService implements IAIProvider {
       const message = error instanceof Error ? error.message : 'An error occurred';
       throw new AppError(500, `${this.getProviderName()} API error: ${message}`);
     }
+  }
+
+  /**
+   * Returns the system prompt for DeepSeek
+   */
+  private getSystemPrompt(): string {
+    return `
+      Формат ответа должен быть в JSON:
+      Твой ответ ДОЛЖЕН быть ТОЛЬКО валидным JSON объектом без дополнительного текста.
+      Поля не должны содержать строки болльше 100 символов.
+
+      Пример ответа:
+      {
+        'text': 'Текст ответа',
+        'source': 'Источник ответа',
+        'tags': ['Теги ответа'],
+      }
+    `;
   }
 }
