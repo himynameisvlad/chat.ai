@@ -2,15 +2,26 @@ import { useState, useCallback } from 'react';
 import { type Message, type FormattedResponse } from '../types';
 import { chatService, ChatServiceError } from '../services/chat.service';
 
-/**
- * Attempts to parse content as JSON formatted response
- */
 function tryParseFormattedResponse(content: string): FormattedResponse | null {
   try {
     const parsed = JSON.parse(content);
-    if (parsed.text && parsed.source && Array.isArray(parsed.tags)) {
+
+    if (!parsed.status || !parsed.text) {
+      return null;
+    }
+
+    if (parsed.status !== 'clarifying' && parsed.status !== 'ready') {
+      return null;
+    }
+
+    if (parsed.status === 'clarifying' && Array.isArray(parsed.questions)) {
       return parsed as FormattedResponse;
     }
+
+    if (parsed.status === 'ready' && parsed.source) {
+      return parsed as FormattedResponse;
+    }
+
     return null;
   } catch {
     return null;
@@ -46,30 +57,32 @@ export function useChat(): UseChatReturn {
       setIsLoading(true);
       setError(null);
 
-      let conversationHistory: Message[] = [];
+      // Add user message to UI immediately
+      const userMessage: Message = {
+        role: 'user',
+        content: message.trim(),
+      };
 
-      setMessages((prevMessages) => {
-        // Store history for API call
-        conversationHistory = prevMessages;
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: '',
+        expectsFormatted: useSystemPrompt,
+      };
 
-        const userMessage: Message = {
-          role: 'user',
-          content: message.trim(),
-        };
+      const conversationHistory = messages;
 
-        const assistantMessage: Message = {
-          role: 'assistant',
-          content: '',
-          expectsFormatted: useSystemPrompt,
-        };
+      setMessages((prev) => [...prev, userMessage, assistantMessage]);
 
-        // Return updated messages with both user and assistant messages
-        return [...prevMessages, userMessage, assistantMessage];
-      });
+      const cleanHistory = conversationHistory
+        .filter((msg) => msg.content.trim().length > 0)
+        .map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        }));
 
       try {
         await chatService.sendMessage(
-          conversationHistory, // Use captured history
+          cleanHistory,
           message.trim(),
           (chunk) => {
             setMessages((prev) => {
@@ -80,18 +93,15 @@ export function useChat(): UseChatReturn {
               if (lastMessage.role === 'assistant') {
                 const newContent = lastMessage.content + chunk;
 
-                // Try to parse as formatted response after each chunk
                 const formattedContent = tryParseFormattedResponse(newContent);
 
                 if (formattedContent) {
                   console.log('✅ JSON parsed successfully:', formattedContent);
                 }
 
-                // Create new message object to trigger React update
                 updated[lastIndex] = {
                   ...lastMessage,
                   content: newContent,
-                  // Keep previous formattedContent if parsing fails, update if succeeds
                   formattedContent: formattedContent || lastMessage.formattedContent,
                 };
               }
@@ -124,12 +134,9 @@ export function useChat(): UseChatReturn {
         setIsLoading(false);
       }
     },
-    [isLoading, useSystemPrompt]
+    [isLoading, useSystemPrompt, messages]
   );
 
-  /**
-   * Clears the current error
-   */
   const clearError = useCallback(() => {
     setError(null);
   }, []);

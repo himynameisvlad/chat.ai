@@ -1,8 +1,16 @@
-export interface FormattedResponse {
+export interface ClarifyingResponse {
+  status: 'clarifying';
   text: string;
-  source: string;
-  tags: string[];
+  questions: string[];
 }
+
+export interface ReadyResponse {
+  status: 'ready';
+  text: string;
+  source?: string;
+}
+
+export type FormattedResponse = ClarifyingResponse | ReadyResponse;
 
 export interface Message {
   role: 'user' | 'assistant';

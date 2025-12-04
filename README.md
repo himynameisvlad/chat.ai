@@ -1,18 +1,5 @@
 # AI Chat Application
 
-A modern, extensible chat application built with React and TypeScript that supports multiple AI providers including DeepSeek and Claude (Anthropic). Features a clean architecture following SOLID principles and design patterns.
-
-## Features
-
-- **Multiple AI Providers**: Support for DeepSeek and Claude (Anthropic) with easy extensibility
-- **Real-time Streaming**: Streaming responses from AI providers
-- **Clean Architecture**: SOLID principles, Strategy pattern, Dependency Injection
-- **Modern UI**: Clean, responsive design with Tailwind CSS
-- **Markdown Support**: Formatted AI responses with React Markdown
-- **Type Safety**: Full TypeScript coverage with runtime validation (Zod)
-- **Error Handling**: Comprehensive error handling and validation
-- **Composable Components**: Well-structured React components with custom hooks
-
 ## Tech Stack
 
 ### Frontend
