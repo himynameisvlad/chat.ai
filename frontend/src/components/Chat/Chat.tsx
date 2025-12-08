@@ -13,7 +13,7 @@ import { MessageInput } from './MessageInput';
  */
 export function Chat() {
   // Custom hooks handle all business logic
-  const { messages, isLoading, useSystemPrompt, setUseSystemPrompt, sendMessage } = useChat();
+  const { messages, isLoading, customPrompt, setCustomPrompt, sendMessage } = useChat();
   const scrollRef = useAutoScroll(messages);
 
   return (
@@ -32,8 +32,8 @@ export function Chat() {
       <MessageInput
         onSendMessage={sendMessage}
         isLoading={isLoading}
-        useSystemPrompt={useSystemPrompt}
-        onToggleSystemPrompt={setUseSystemPrompt}
+        customPrompt={customPrompt}
+        onCustomPromptChange={setCustomPrompt}
       />
     </div>
   );

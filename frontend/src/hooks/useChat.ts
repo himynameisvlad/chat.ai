@@ -1,39 +1,13 @@
 import { useState, useCallback } from 'react';
-import { type Message, type FormattedResponse } from '../types';
+import { type Message } from '../types';
 import { chatService, ChatServiceError } from '../services/chat.service';
-
-function tryParseFormattedResponse(content: string): FormattedResponse | null {
-  try {
-    const parsed = JSON.parse(content);
-
-    if (!parsed.status || !parsed.text) {
-      return null;
-    }
-
-    if (parsed.status !== 'clarifying' && parsed.status !== 'ready') {
-      return null;
-    }
-
-    if (parsed.status === 'clarifying' && Array.isArray(parsed.questions)) {
-      return parsed as FormattedResponse;
-    }
-
-    if (parsed.status === 'ready' && parsed.source) {
-      return parsed as FormattedResponse;
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
 
 interface UseChatReturn {
   messages: Message[];
   isLoading: boolean;
   error: string | null;
-  useSystemPrompt: boolean;
-  setUseSystemPrompt: (value: boolean) => void;
+  customPrompt: string;
+  setCustomPrompt: (value: string) => void;
   sendMessage: (message: string) => Promise<void>;
   clearError: () => void;
 }
@@ -42,7 +16,7 @@ export function useChat(): UseChatReturn {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [useSystemPrompt, setUseSystemPrompt] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState('');
 
   /**
    * Sends a message to the chat API
@@ -66,7 +40,6 @@ export function useChat(): UseChatReturn {
       const assistantMessage: Message = {
         role: 'assistant',
         content: '',
-        expectsFormatted: useSystemPrompt,
       };
 
       const conversationHistory = messages;
@@ -91,24 +64,15 @@ export function useChat(): UseChatReturn {
               const lastMessage = updated[lastIndex];
 
               if (lastMessage.role === 'assistant') {
-                const newContent = lastMessage.content + chunk;
-
-                const formattedContent = tryParseFormattedResponse(newContent);
-
-                if (formattedContent) {
-                  console.log('✅ JSON parsed successfully:', formattedContent);
-                }
-
                 updated[lastIndex] = {
                   ...lastMessage,
-                  content: newContent,
-                  formattedContent: formattedContent || lastMessage.formattedContent,
+                  content: lastMessage.content + chunk,
                 };
               }
               return updated;
             });
           },
-          useSystemPrompt
+          customPrompt || undefined
         );
       } catch (err) {
         const errorMessage =
@@ -134,7 +98,7 @@ export function useChat(): UseChatReturn {
         setIsLoading(false);
       }
     },
-    [isLoading, useSystemPrompt, messages]
+    [isLoading, customPrompt, messages]
   );
 
   const clearError = useCallback(() => {
@@ -145,8 +109,8 @@ export function useChat(): UseChatReturn {
     messages,
     isLoading,
     error,
-    useSystemPrompt,
-    setUseSystemPrompt,
+    customPrompt,
+    setCustomPrompt,
     sendMessage,
     clearError,
   };

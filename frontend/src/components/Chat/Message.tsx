@@ -1,6 +1,5 @@
 import ReactMarkdown from 'react-markdown';
 import { type Message as MessageType } from '../../types';
-import { FormattedResponseView } from './FormattedResponseView';
 import { LoadingIndicator } from './LoadingIndicator';
 
 /**
@@ -30,13 +29,11 @@ export function Message({ message }: MessageProps) {
       >
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
-        ) : message.expectsFormatted && !message.formattedContent ? (
+        ) : !message.content ? (
           <LoadingIndicator />
-        ) : message.formattedContent ? (
-          <FormattedResponseView data={message.formattedContent} />
         ) : (
           <div className="prose prose-sm max-w-none">
-            <ReactMarkdown>{message.content || '...'}</ReactMarkdown>
+            <ReactMarkdown>{message.content}</ReactMarkdown>
           </div>
         )}
       </div>

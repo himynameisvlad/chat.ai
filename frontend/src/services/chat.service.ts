@@ -34,13 +34,13 @@ export class ChatService {
    * @param messages - Conversation history
    * @param message - New message to send
    * @param onChunk - Callback for each text chunk received
-   * @param useSystemPrompt - Whether to include system prompt
+   * @param customPrompt - Optional custom system prompt
    */
   async sendMessage(
     messages: Message[],
     message: string,
     onChunk: (text: string) => void,
-    useSystemPrompt?: boolean
+    customPrompt?: string
   ): Promise<void> {
     try {
       const response = await fetch(`${this.baseUrl}/api/chat`, {
@@ -48,7 +48,7 @@ export class ChatService {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messages, message, useSystemPrompt }),
+        body: JSON.stringify({ messages, message, customPrompt }),
       });
 
       if (!response.ok) {

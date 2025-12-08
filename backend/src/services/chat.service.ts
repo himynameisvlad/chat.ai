@@ -14,13 +14,13 @@ export class ChatService {
    * @param conversationHistory - Previous messages in the conversation
    * @param newMessage - The new message from the user
    * @param response - Express response object for streaming
-   * @param useSystemPrompt - Whether to include system prompt
+   * @param customPrompt - Optional custom system prompt
    */
   async processChat(
     conversationHistory: Message[],
     newMessage: string,
     response: StreamResponse,
-    useSystemPrompt?: boolean
+    customPrompt?: string
   ): Promise<void> {
     this.validateMessage(newMessage);
 
@@ -28,7 +28,7 @@ export class ChatService {
     const messages = this.buildConversation(conversationHistory, newMessage);
 
     // Delegate to AI provider
-    await this.aiProvider.streamChat(messages, response, useSystemPrompt);
+    await this.aiProvider.streamChat(messages, response, customPrompt);
   }
 
   /**

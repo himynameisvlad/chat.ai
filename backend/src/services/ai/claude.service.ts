@@ -25,7 +25,7 @@ export class ClaudeService implements IAIProvider {
     this.maxTokens = config.maxTokens || 4096;
   }
 
-  async streamChat(messages: Message[], response: StreamResponse, useSystemPrompt?: boolean): Promise<void> {
+  async streamChat(messages: Message[], response: StreamResponse, customPrompt?: string): Promise<void> {
     try {
       // Set headers for Server-Sent Events (SSE)
       this.setStreamHeaders(response);

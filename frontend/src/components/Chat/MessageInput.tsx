@@ -3,11 +3,11 @@ import { useState, useRef, type KeyboardEvent, type FormEvent } from 'react';
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
   isLoading: boolean;
-  useSystemPrompt: boolean;
-  onToggleSystemPrompt: (value: boolean) => void;
+  customPrompt: string;
+  onCustomPromptChange: (value: string) => void;
 }
 
-export function MessageInput({ onSendMessage, isLoading, useSystemPrompt, onToggleSystemPrompt }: MessageInputProps) {
+export function MessageInput({ onSendMessage, isLoading, customPrompt, onCustomPromptChange }: MessageInputProps) {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -56,21 +56,22 @@ export function MessageInput({ onSendMessage, isLoading, useSystemPrompt, onTogg
             {isLoading ? 'Sending...' : 'Send'}
           </button>
         </div>
-        <div className="mt-3 flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="useSystemPrompt"
-            checked={useSystemPrompt}
-            onChange={(e) => onToggleSystemPrompt(e.target.checked)}
-            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+        <div className="mt-3">
+          <label
+            htmlFor="customPrompt"
+            className="block text-sm font-medium text-gray-700 mb-2"
+          >
+            Custom System Prompt (optional)
+          </label>
+          <textarea
+            id="customPrompt"
+            value={customPrompt}
+            onChange={(e) => onCustomPromptChange(e.target.value)}
+            placeholder="Enter custom system prompt or leave empty to use default..."
+            className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            rows={3}
             disabled={isLoading}
           />
-          <label
-            htmlFor="useSystemPrompt"
-            className="text-sm text-gray-700 cursor-pointer select-none"
-          >
-            Formatted
-          </label>
         </div>
       </form>
     </div>

@@ -24,20 +24,22 @@ export class DeepSeekService implements IAIProvider {
     this.model = config.model;
   }
 
-  async streamChat(messages: Message[], response: StreamResponse, useSystemPrompt?: boolean): Promise<void> {
+  async streamChat(messages: Message[], response: StreamResponse, customPrompt?: string): Promise<void> {
     try {
       // Set headers for Server-Sent Events (SSE)
       this.setStreamHeaders(response);
 
-      // Add system prompt if requested
-      let messagesToSend = messages;
-      if (useSystemPrompt) {
-        const systemMessage: Message = {
-          role: 'system',
-          content: this.getSystemPrompt(),
-        };
-        messagesToSend = [systemMessage, ...messages];
-      }
+      // Always add system prompt (use custom if provided, otherwise use default)
+      const systemPromptContent = customPrompt || this.getDefaultSystemPrompt();
+
+      const systemMessage: Message = {
+        role: 'system',
+        content: systemPromptContent,
+      };
+
+      // Filter out any system messages from history to avoid conflicts
+      const filteredMessages = messages.filter(msg => msg.role !== 'system');
+      const messagesToSend = [systemMessage, ...filteredMessages];
 
       // Convert messages to OpenAI format
       const formattedMessages: OpenAI.Chat.ChatCompletionMessageParam[] =
@@ -55,7 +57,6 @@ export class DeepSeekService implements IAIProvider {
 
       // Stream the response chunks
       await this.processStream(stream, response);
-
     } catch (error) {
       this.handleStreamError(error, response);
     }
@@ -110,66 +111,38 @@ export class DeepSeekService implements IAIProvider {
   }
 
   /**
-   * Returns the system prompt for DeepSeek with iterative information gathering
+   * Returns the default system prompt for DeepSeek with iterative information gathering
    */
-  private getSystemPrompt(): string {
-    return `
-      Ты интеллектуальный ассистент, работающий в режиме пошагового анализа.
+  private getDefaultSystemPrompt(): string {
+    return `Ты интеллектуальный ассистент, работающий в режиме пошагового анализа.
 
-      ВАЖНО: Твой ответ ДОЛЖЕН быть ТОЛЬКО валидным JSON объектом без дополнительного текста.
+ПРОЦЕСС РАБОТЫ:
+1. Проанализируй запрос пользователя
+2. Если информации НЕДОСТАТОЧНО для полного ответа → задай 1-2 конкретных уточняющих вопроса
+3. Если информации ДОСТАТОЧНО → дай полный развернутый ответ
 
-      ПРОЦЕСС РАБОТЫ:
-      1. Проанализируй запрос пользователя
-      2. Если информации НЕДОСТАТОЧНО для полного ответа → задай 1-2 конкретных уточняющих вопроса
-      3. Если информации ДОСТАТОЧНО → дай полный ответ
+ПРИМЕРЫ:
 
-      ФОРМАТ ОТВЕТА:
-      {
-        "status": "clarifying" | "ready",
-        "text": "Основной текст ответа или вопроса",
-        "questions": ["Вопрос 1?", "Вопрос 2?"],  // только для status="clarifying"
-        "source": "Источник информации",           // только для status="ready"
-      }
+Пример 1 - Недостаточно информации:
+Запрос: "Посоветуй ноутбук"
+Ответ: "Чтобы подобрать подходящий ноутбук, уточни несколько моментов:
+- Какой у тебя бюджет?
+- Для каких задач будешь использовать (работа, игры, учеба)?"
 
-      ПРИМЕРЫ:
+Пример 2 - Достаточно информации:
+После получения ответов: "На основе твоих требований (бюджет 50к, для работы и учебы) рекомендую MacBook Air M2. Он отлично подходит для..."
 
-      Пример 1 - Недостаточно информации (status: "clarifying"):
-      Запрос: "Посоветуй ноутбук"
-      Ответ:
-      {
-        "status": "clarifying",
-        "text": "Чтобы подобрать подходящий ноутбук, уточни несколько моментов:",
-        "questions": [
-          "Какой у тебя бюджет?",
-          "Для каких задач будешь использовать (работа, игры, учеба)?",
-        ]
-      }
+Пример 3 - Простой вопрос:
+Запрос: "Сколько будет 2+2?"
+Ответ: "2 + 2 = 4"
 
-      Пример 2 - Достаточно информации (status: "ready"):
-      После получения ответов:
-      {
-        "status": "ready",
-        "text": "На основе твоих требований: бюджет 50к, для работы и учебы, рекомендую MacBook Air M2",
-        "source": "Анализ требований и характеристик",
-      }
-
-      Пример 3 - Простой вопрос (сразу status: "ready"):
-      Запрос: "Сколько будет 2+2?"
-      Ответ:
-      {
-        "status": "ready",
-        "text": "2 + 2 = 4",
-        "source": "Математика",
-      }
-
-      ПРАВИЛА:
-      - НЕ давай финальный ответ, пока не получишь ВСЮ ключевую информацию
-      - Задавай 1-2 вопроса за раз (не перегружай пользователя)
-      - Вопросы должны быть конкретными и важными для ответа
-      - Если запрос простой и однозначный - сразу давай ответ со status="ready"
-      - Поля text/source не должны быть длиннее 150 символов
-      - НЕ задавай очевидные вопросы, только те, что действительно нужны
-      - Держи в памяти информацию о предыдущих запросах и ответах, а также первоначальную тему
-    `;
+ПРАВИЛА:
+- НЕ давай финальный ответ, пока не получишь ВСЮ ключевую информацию
+- Задавай 1-2 вопроса за раз (не перегружай пользователя)
+- Вопросы должны быть конкретными и важными для ответа
+- Если запрос простой и однозначный - сразу давай полный ответ
+- НЕ задавай очевидные вопросы, только те, что действительно нужны
+- Держи в памяти информацию о предыдущих запросах и ответах
+- Отвечай на русском языке естественным образом, без специального форматирования`;
   }
 }
