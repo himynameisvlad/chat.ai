@@ -5,9 +5,11 @@ interface MessageInputProps {
   isLoading: boolean;
   customPrompt: string;
   onCustomPromptChange: (value: string) => void;
+  temperature: number;
+  onTemperatureChange: (value: number) => void;
 }
 
-export function MessageInput({ onSendMessage, isLoading, customPrompt, onCustomPromptChange }: MessageInputProps) {
+export function MessageInput({ onSendMessage, isLoading, customPrompt, onCustomPromptChange, temperature, onTemperatureChange }: MessageInputProps) {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -72,6 +74,28 @@ export function MessageInput({ onSendMessage, isLoading, customPrompt, onCustomP
             rows={3}
             disabled={isLoading}
           />
+        </div>
+        <div className="mt-3">
+          <label
+            htmlFor="temperature"
+            className="block text-sm font-medium text-gray-700 mb-2"
+          >
+            Temperature (0-2)
+          </label>
+          <input
+            id="temperature"
+            type="number"
+            min="0"
+            max="2"
+            step="0.1"
+            value={temperature}
+            onChange={(e) => onTemperatureChange(Number(e.target.value))}
+            disabled={isLoading}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Lower values (0-0.5) are more precise, higher values (1-2) are more creative
+          </p>
         </div>
       </form>
     </div>

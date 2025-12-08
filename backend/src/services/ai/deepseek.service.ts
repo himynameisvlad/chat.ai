@@ -24,7 +24,7 @@ export class DeepSeekService implements IAIProvider {
     this.model = config.model;
   }
 
-  async streamChat(messages: Message[], response: StreamResponse, customPrompt?: string): Promise<void> {
+  async streamChat(messages: Message[], response: StreamResponse, customPrompt?: string, temperature?: number): Promise<void> {
     try {
       // Set headers for Server-Sent Events (SSE)
       this.setStreamHeaders(response);
@@ -39,7 +39,7 @@ export class DeepSeekService implements IAIProvider {
 
       // Filter out any system messages from history to avoid conflicts
       const filteredMessages = messages.filter(msg => msg.role !== 'system');
-      const messagesToSend = [systemMessage, ...filteredMessages];
+      const messagesToSend = [...filteredMessages];
 
       // Convert messages to OpenAI format
       const formattedMessages: OpenAI.Chat.ChatCompletionMessageParam[] =
@@ -53,6 +53,7 @@ export class DeepSeekService implements IAIProvider {
         model: this.model,
         messages: formattedMessages,
         stream: true,
+        temperature: temperature ?? 0.7,
       });
 
       // Stream the response chunks

@@ -8,6 +8,8 @@ interface UseChatReturn {
   error: string | null;
   customPrompt: string;
   setCustomPrompt: (value: string) => void;
+  temperature: number;
+  setTemperature: (value: number) => void;
   sendMessage: (message: string) => Promise<void>;
   clearError: () => void;
 }
@@ -17,6 +19,7 @@ export function useChat(): UseChatReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
+  const [temperature, setTemperature] = useState(0.7);
 
   /**
    * Sends a message to the chat API
@@ -72,7 +75,8 @@ export function useChat(): UseChatReturn {
               return updated;
             });
           },
-          customPrompt || undefined
+          customPrompt || undefined,
+          temperature
         );
       } catch (err) {
         const errorMessage =
@@ -98,7 +102,7 @@ export function useChat(): UseChatReturn {
         setIsLoading(false);
       }
     },
-    [isLoading, customPrompt, messages]
+    [isLoading, customPrompt, temperature, messages]
   );
 
   const clearError = useCallback(() => {
@@ -111,6 +115,8 @@ export function useChat(): UseChatReturn {
     error,
     customPrompt,
     setCustomPrompt,
+    temperature,
+    setTemperature,
     sendMessage,
     clearError,
   };

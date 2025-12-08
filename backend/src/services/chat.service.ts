@@ -15,12 +15,14 @@ export class ChatService {
    * @param newMessage - The new message from the user
    * @param response - Express response object for streaming
    * @param customPrompt - Optional custom system prompt
+   * @param temperature - Optional temperature parameter for AI response
    */
   async processChat(
     conversationHistory: Message[],
     newMessage: string,
     response: StreamResponse,
-    customPrompt?: string
+    customPrompt?: string,
+    temperature?: number
   ): Promise<void> {
     this.validateMessage(newMessage);
 
@@ -28,7 +30,7 @@ export class ChatService {
     const messages = this.buildConversation(conversationHistory, newMessage);
 
     // Delegate to AI provider
-    await this.aiProvider.streamChat(messages, response, customPrompt);
+    await this.aiProvider.streamChat(messages, response, customPrompt, temperature);
   }
 
   /**

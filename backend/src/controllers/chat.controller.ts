@@ -19,9 +19,9 @@ export class ChatController {
     next: NextFunction
   ): Promise<void> => {
     try {
-      const { messages, message, customPrompt } = req.body;
+      const { messages, message, customPrompt, temperature } = req.body;
 
-      await this.chatService.processChat(messages, message, res, customPrompt);
+      await this.chatService.processChat(messages, message, res, customPrompt, temperature);
     } catch (error) {
       next(error);
     }
