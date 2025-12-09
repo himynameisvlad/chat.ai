@@ -3,6 +3,7 @@ import cors from 'cors';
 import { config } from './config/app.config';
 import { DeepSeekService } from './services/ai/deepseek.service';
 import { ClaudeService } from './services/ai/claude.service';
+import { HuggingFaceService } from './services/ai/huggingface.service';
 import { ChatService } from './services/chat.service';
 import { ChatController } from './controllers/chat.controller';
 import { createChatRoutes } from './routes/chat.routes';
@@ -67,6 +68,11 @@ class Application {
           apiKey: config.ai.claude.apiKey,
           model: config.ai.claude.model,
           maxTokens: config.ai.claude.maxTokens,
+        });
+      case 'huggingface':
+        return new HuggingFaceService({
+          apiKey: config.ai.huggingface.apiKey,
+          model: config.ai.huggingface.model,
         });
       // Easy to add more providers in the future:
       // case 'openai':
