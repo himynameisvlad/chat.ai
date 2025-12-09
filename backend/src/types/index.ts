@@ -9,6 +9,7 @@ export interface ChatRequest {
   messages: Message[];
   message: string;
   customPrompt?: string;
+  temperature?: number;
 }
 
 export interface StreamChunk {

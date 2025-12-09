@@ -35,12 +35,14 @@ export class ChatService {
    * @param message - New message to send
    * @param onChunk - Callback for each text chunk received
    * @param customPrompt - Optional custom system prompt
+   * @param temperature - Temperature parameter for AI response
    */
   async sendMessage(
     messages: Message[],
     message: string,
     onChunk: (text: string) => void,
-    customPrompt?: string
+    customPrompt?: string,
+    temperature?: number
   ): Promise<void> {
     try {
       const response = await fetch(`${this.baseUrl}/api/chat`, {
@@ -48,7 +50,7 @@ export class ChatService {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ messages, message, customPrompt }),
+        body: JSON.stringify({ messages, message, customPrompt, temperature }),
       });
 
       if (!response.ok) {

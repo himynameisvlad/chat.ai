@@ -13,7 +13,7 @@ import { MessageInput } from './MessageInput';
  */
 export function Chat() {
   // Custom hooks handle all business logic
-  const { messages, isLoading, customPrompt, setCustomPrompt, sendMessage } = useChat();
+  const { messages, isLoading, customPrompt, setCustomPrompt, temperature, setTemperature, sendMessage } = useChat();
   const scrollRef = useAutoScroll(messages);
 
   return (
@@ -34,6 +34,8 @@ export function Chat() {
         isLoading={isLoading}
         customPrompt={customPrompt}
         onCustomPromptChange={setCustomPrompt}
+        temperature={temperature}
+        onTemperatureChange={setTemperature}
       />
     </div>
   );
