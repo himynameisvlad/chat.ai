@@ -58,7 +58,7 @@ export function MessageInput({ onSendMessage, isLoading, customPrompt, onCustomP
             {isLoading ? 'Sending...' : 'Send'}
           </button>
         </div>
-        <div className="mt-3">
+        {/* <div className="mt-3">
           <label
             htmlFor="customPrompt"
             className="block text-sm font-medium text-gray-700 mb-2"
@@ -74,8 +74,8 @@ export function MessageInput({ onSendMessage, isLoading, customPrompt, onCustomP
             rows={3}
             disabled={isLoading}
           />
-        </div>
-        <div className="mt-3">
+        </div> */}
+        {/* <div className="mt-3">
           <label
             htmlFor="temperature"
             className="block text-sm font-medium text-gray-700 mb-2"
@@ -96,7 +96,7 @@ export function MessageInput({ onSendMessage, isLoading, customPrompt, onCustomP
           <p className="mt-1 text-xs text-gray-500">
             Lower values (0-0.5) are more precise, higher values (1-2) are more creative
           </p>
-        </div>
+        </div> */}
       </form>
     </div>
   );
