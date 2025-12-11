@@ -8,10 +8,6 @@ interface ClaudeConfig {
   maxTokens?: number;
 }
 
-/**
- * Claude AI Provider implementation.
- * Follows Single Responsibility Principle - only handles Claude API interactions.
- */
 export class ClaudeService implements IAIProvider {
   private client: Anthropic;
   private model: string;
@@ -78,6 +74,21 @@ export class ClaudeService implements IAIProvider {
       if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
         const data = JSON.stringify({ text: event.delta.text });
         response.write(`data: ${data}\n\n`);
+      }
+
+      // Handle token usage information
+      if (event.type === 'message_delta' && event.usage) {
+        const inputTokens = (event.usage as any).input_tokens || 0;
+        const outputTokens = event.usage.output_tokens || 0;
+        const tokenData = JSON.stringify({
+          type: 'token_usage',
+          usage: {
+            prompt_tokens: inputTokens,
+            completion_tokens: outputTokens,
+            total_tokens: inputTokens + outputTokens
+          }
+        });
+        response.write(`data: ${tokenData}\n\n`);
       }
 
       // Handle stream completion

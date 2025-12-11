@@ -1,9 +1,6 @@
-import { type Message } from '../types';
+import { type Message, type TokenUsage } from '../types';
 import { config } from '../config/app.config';
 
-/**
- * Custom error class for chat service errors
- */
 export class ChatServiceError extends Error {
   public statusCode?: number;
 
@@ -17,11 +14,6 @@ export class ChatServiceError extends Error {
   }
 }
 
-/**
- * Chat Service
- * Handles all communication with the chat API
- * Follows Single Responsibility Principle - only handles API communication
- */
 export class ChatService {
   private readonly baseUrl: string;
 
@@ -34,6 +26,7 @@ export class ChatService {
    * @param messages - Conversation history
    * @param message - New message to send
    * @param onChunk - Callback for each text chunk received
+   * @param onTokens - Callback for token usage information
    * @param customPrompt - Optional custom system prompt
    * @param temperature - Temperature parameter for AI response
    */
@@ -41,6 +34,7 @@ export class ChatService {
     messages: Message[],
     message: string,
     onChunk: (text: string) => void,
+    onTokens: (usage: TokenUsage) => void,
     customPrompt?: string,
     temperature?: number
   ): Promise<void> {
@@ -60,7 +54,7 @@ export class ChatService {
         );
       }
 
-      await this.processStream(response, onChunk);
+      await this.processStream(response, onChunk, onTokens);
     } catch (error) {
       if (error instanceof ChatServiceError) {
         throw error;
@@ -78,7 +72,8 @@ export class ChatService {
    */
   private async processStream(
     response: Response,
-    onChunk: (text: string) => void
+    onChunk: (text: string) => void,
+    onTokens: (usage: TokenUsage) => void
   ): Promise<void> {
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
@@ -108,8 +103,15 @@ export class ChatService {
 
             try {
               const parsed = JSON.parse(data);
+
+              // Handle text chunks
               if (parsed.text) {
                 onChunk(parsed.text);
+              }
+
+              // Handle token usage events
+              if (parsed.type === 'token_usage' && parsed.usage) {
+                onTokens(parsed.usage);
               }
             } catch (e) {
               console.error('Failed to parse chunk:', e);

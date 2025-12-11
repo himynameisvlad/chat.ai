@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import { type Message as MessageType } from '../../types';
 import { LoadingIndicator } from './LoadingIndicator';
+import { TokenUsage } from './TokenUsage';
 
 /**
  * Props for the Message component
@@ -32,9 +33,14 @@ export function Message({ message }: MessageProps) {
         ) : !message.content ? (
           <LoadingIndicator />
         ) : (
-          <div className="prose prose-sm max-w-none">
-            <ReactMarkdown>{message.content}</ReactMarkdown>
-          </div>
+          <>
+            <div className="prose prose-sm max-w-none">
+              <ReactMarkdown>{message.content}</ReactMarkdown>
+            </div>
+
+            {/* Token usage display for assistant messages */}
+            {message.tokens && <TokenUsage usage={message.tokens} />}
+          </>
         )}
       </div>
     </div>

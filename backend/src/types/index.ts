@@ -16,6 +16,17 @@ export interface StreamChunk {
   text: string;
 }
 
+export interface TokenUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
+export interface TokenMetadataEvent {
+  type: 'token_usage';
+  usage: TokenUsage;
+}
+
 export type StreamResponse = Response;
 
 export class AppError extends Error {
