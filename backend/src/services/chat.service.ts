@@ -26,10 +26,9 @@ export class ChatService {
   ): Promise<void> {
     this.validateMessage(newMessage);
 
-    // Build complete conversation
-    const messages = this.buildConversation(conversationHistory, newMessage);
+    const processedHistory = await this.processHistory(conversationHistory);
+    const messages = this.buildConversation(processedHistory, newMessage);
 
-    // Delegate to AI provider
     await this.aiProvider.streamChat(messages, response, customPrompt, temperature);
   }
 
@@ -60,6 +59,60 @@ export class ChatService {
         content: newMessage,
       },
     ];
+  }
+
+  private async processHistory(history: Message[]): Promise<Message[]> {
+    if (history.length <= 10) {
+      return history;
+    }
+
+    const recentCount = 6;
+    const oldMessages = history.slice(0, -recentCount);
+    const recentMessages = history.slice(-recentCount);
+
+    const summary = await this.summarizeMessages(oldMessages);
+
+    return [
+      { role: 'system' as const, content: `Previous conversation summary: ${summary}` },
+      ...recentMessages
+    ];
+  }
+
+  private async summarizeMessages(messages: Message[]): Promise<string> {
+    console.log('summarizeMessages');
+    const conversationText = messages
+      .map(msg => `${msg.role}: ${msg.content}`)
+      .join('\n');
+
+    const summaryPrompt = `Summarize this conversation concisely in 2-3 sentences. It's important to memorize and retain all critical information, key facts, and important context from the conversation:\n\n${conversationText}`;
+
+    return new Promise((resolve, reject) => {
+      let summary = '';
+
+      const mockResponse = {
+        setHeader: () => {},
+        write: (data: string) => {
+          if (data.startsWith('data: ') && !data.includes('[DONE]') && !data.includes('token_usage')) {
+            try {
+              const jsonStr = data.slice(6).trim();
+              const parsed = JSON.parse(jsonStr);
+              if (parsed.text) {
+                summary += parsed.text;
+              }
+            } catch {}
+          }
+        },
+        end: () => resolve(summary),
+        headersSent: false,
+        closed: false,
+        writable: true
+      } as unknown as StreamResponse;
+
+      this.aiProvider.streamChat(
+        [{ role: 'user', content: summaryPrompt }],
+        mockResponse
+      ).catch(reject);
+    });
   }
 
   /**
