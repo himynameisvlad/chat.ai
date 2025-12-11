@@ -7,10 +7,6 @@ interface HuggingFaceConfig {
   model: string;
 }
 
-/**
- * HuggingFace AI Provider implementation.
- * Follows Single Responsibility Principle - only handles HuggingFace API interactions.
- */
 export class HuggingFaceService implements IAIProvider {
   private client: InferenceClient;
   private model: string;
@@ -72,13 +68,25 @@ export class HuggingFaceService implements IAIProvider {
         response.write(`data: ${data}\n\n`);
       }
 
-      // Log token usage if available
+      // Log and send token usage if available
       if (chunk.usage) {
+        // Keep logging for debugging
         console.log(`[${this.getProviderName()}] Token usage:`, {
           prompt_tokens: chunk.usage.prompt_tokens,
           completion_tokens: chunk.usage.completion_tokens,
           total_tokens: chunk.usage.total_tokens,
         });
+
+        // Send to frontend
+        const tokenData = JSON.stringify({
+          type: 'token_usage',
+          usage: {
+            prompt_tokens: chunk.usage.prompt_tokens || 0,
+            completion_tokens: chunk.usage.completion_tokens || 0,
+            total_tokens: chunk.usage.total_tokens || 0
+          }
+        });
+        response.write(`data: ${tokenData}\n\n`);
       }
 
       if (chunk.choices?.[0]?.finish_reason) {

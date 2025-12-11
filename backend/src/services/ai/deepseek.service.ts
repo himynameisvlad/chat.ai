@@ -8,10 +8,6 @@ interface DeepSeekConfig {
   model: string;
 }
 
-/**
- * DeepSeek AI Provider implementation.
- * Follows Single Responsibility Principle - only handles DeepSeek API interactions.
- */
 export class DeepSeekService implements IAIProvider {
   private client: OpenAI;
   private model: string;
@@ -48,15 +44,14 @@ export class DeepSeekService implements IAIProvider {
           content: msg.content,
         }));
 
-      // Create streaming request
       const stream = await this.client.chat.completions.create({
         model: this.model,
         messages: formattedMessages,
         stream: true,
         temperature: temperature ?? 0.7,
+        max_tokens: 150,
       });
 
-      // Stream the response chunks
       await this.processStream(stream, response);
     } catch (error) {
       this.handleStreamError(error, response);
@@ -89,6 +84,19 @@ export class DeepSeekService implements IAIProvider {
       if (content) {
         const data = JSON.stringify({ text: content });
         response.write(`data: ${data}\n\n`);
+      }
+
+      // Send token usage when available (typically in final chunk)
+      if (chunk.usage) {
+        const tokenData = JSON.stringify({
+          type: 'token_usage',
+          usage: {
+            prompt_tokens: chunk.usage.prompt_tokens || 0,
+            completion_tokens: chunk.usage.completion_tokens || 0,
+            total_tokens: chunk.usage.total_tokens || 0
+          }
+        });
+        response.write(`data: ${tokenData}\n\n`);
       }
 
       if (chunk.choices[0]?.finish_reason === 'stop') {

@@ -2,6 +2,7 @@ import { useChat } from '../../hooks/useChat';
 import { useAutoScroll } from '../../hooks/useAutoScroll';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
+import { SessionTokenCounter } from './SessionTokenCounter';
 
 /**
  * Chat Component
@@ -13,14 +14,17 @@ import { MessageInput } from './MessageInput';
  */
 export function Chat() {
   // Custom hooks handle all business logic
-  const { messages, isLoading, customPrompt, setCustomPrompt, temperature, setTemperature, sendMessage } = useChat();
+  const { messages, isLoading, customPrompt, setCustomPrompt, temperature, setTemperature, sendMessage, sessionTokens } = useChat();
   const scrollRef = useAutoScroll(messages);
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      {/* Header */}
+      {/* Header with session tokens */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
-        <h1 className="text-2xl font-semibold text-gray-800">AI Chat</h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-semibold text-gray-800">AI Chat</h1>
+          <SessionTokenCounter sessionTokens={sessionTokens} />
+        </div>
       </header>
 
       {/* Messages Area */}
