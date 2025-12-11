@@ -29,12 +29,11 @@ export class HuggingFaceService implements IAIProvider {
         content: msg.content,
       }));
 
-      // Create streaming request with Featherless AI provider
       const stream = this.client.chatCompletionStream({
         model: this.model,
         messages: formattedMessages,
         max_tokens: 2048,
-        provider: 'featherless-ai', // Use Featherless AI provider
+       //  provider: 'featherless-ai', // Use Featherless AI provider
       });
 
       // Stream the response chunks
@@ -60,6 +59,9 @@ export class HuggingFaceService implements IAIProvider {
     stream: AsyncIterable<any>,
     response: StreamResponse
   ): Promise<void> {
+    let streamFinished = false;
+    let finalTokenUsage = null;
+
     for await (const chunk of stream) {
       const content = chunk.choices?.[0]?.delta?.content;
 
@@ -68,30 +70,36 @@ export class HuggingFaceService implements IAIProvider {
         response.write(`data: ${data}\n\n`);
       }
 
-      // Log and send token usage if available
-      if (chunk.usage) {
-        // Keep logging for debugging
-        console.log(`[${this.getProviderName()}] Token usage:`, {
-          prompt_tokens: chunk.usage.prompt_tokens,
-          completion_tokens: chunk.usage.completion_tokens,
-          total_tokens: chunk.usage.total_tokens,
-        });
+      // Mark stream as finished when we see finish_reason
+      if (chunk.choices?.[0]?.finish_reason) {
+        streamFinished = true;
+      }
 
-        // Send to frontend
+      // Store and send token usage when available
+      if (chunk.usage) {
+        finalTokenUsage = chunk.usage;
+
         const tokenData = JSON.stringify({
           type: 'token_usage',
           usage: {
-            prompt_tokens: chunk.usage.prompt_tokens || 0,
-            completion_tokens: chunk.usage.completion_tokens || 0,
-            total_tokens: chunk.usage.total_tokens || 0
+            prompt_tokens: finalTokenUsage.prompt_tokens || 0,
+            completion_tokens: finalTokenUsage.completion_tokens || 0,
+            total_tokens: finalTokenUsage.total_tokens || 0
           }
         });
         response.write(`data: ${tokenData}\n\n`);
-      }
 
-      if (chunk.choices?.[0]?.finish_reason) {
-        response.write('data: [DONE]\n\n');
+        // If stream already finished, send [DONE] now
+        if (streamFinished) {
+          response.write('data: [DONE]\n\n');
+          break;
+        }
       }
+    }
+
+    // If stream finished but no usage was received, still send [DONE]
+    if (streamFinished && !finalTokenUsage) {
+      response.write('data: [DONE]\n\n');
     }
 
     response.end();
