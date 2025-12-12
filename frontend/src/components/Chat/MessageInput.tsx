@@ -3,13 +3,13 @@ import { useState, useRef, type KeyboardEvent, type FormEvent } from 'react';
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
   isLoading: boolean;
-  customPrompt: string;
-  onCustomPromptChange: (value: string) => void;
-  temperature: number;
-  onTemperatureChange: (value: number) => void;
+  customPrompt?: string;
+  onCustomPromptChange?: (value: string) => void;
+  temperature?: number;
+  onTemperatureChange?: (value: number) => void;
 }
 
-export function MessageInput({ onSendMessage, isLoading, customPrompt, onCustomPromptChange, temperature, onTemperatureChange }: MessageInputProps) {
+export function MessageInput({ onSendMessage, isLoading }: MessageInputProps) {
   const [input, setInput] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
