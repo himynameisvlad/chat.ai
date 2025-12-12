@@ -1,10 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from '../types';
 
-/**
- * Centralized error handling middleware.
- * Provides consistent error responses across the application.
- */
 export const errorHandler = (
   error: Error | AppError,
   req: Request,

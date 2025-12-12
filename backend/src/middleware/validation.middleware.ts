@@ -17,10 +17,6 @@ const chatRequestSchema = z.object({
   temperature: z.number().min(0, 'Temperature must be at least 0').max(2, 'Temperature must be at most 2').optional(),
 });
 
-/**
- * Middleware to validate chat requests using Zod.
- * Provides type-safe validation with clear error messages.
- */
 export const validateChatRequest = (
   req: Request,
   res: Response,

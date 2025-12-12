@@ -7,16 +7,11 @@ interface AppConfig {
     port: number;
   };
   ai: {
-    provider: 'deepseek' | 'openai' | 'claude' | 'huggingface';
+    provider: 'deepseek' | 'openai' | 'huggingface';
     deepseek: {
       apiKey: string;
       baseURL: string;
       model: string;
-    };
-    claude: {
-      apiKey: string;
-      model: string;
-      maxTokens: number;
     };
     huggingface: {
       apiKey: string;
@@ -31,16 +26,11 @@ const getConfig = (): AppConfig => {
       port: parseInt(process.env.PORT || '3001', 10),
     },
     ai: {
-      provider: (process.env.AI_PROVIDER as 'deepseek' | 'openai' | 'claude' | 'huggingface') || 'deepseek',
+      provider: (process.env.AI_PROVIDER as 'deepseek' | 'openai' | 'huggingface') || 'deepseek',
       deepseek: {
         apiKey: process.env.DEEPSEEK_API_KEY || '',
         baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',
         model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
-      },
-      claude: {
-        apiKey: process.env.ANTHROPIC_API_KEY || '',
-        model: process.env.CLAUDE_MODEL || 'claude-3-5-sonnet-20241022',
-        maxTokens: parseInt(process.env.CLAUDE_MAX_TOKENS || '4096', 10),
       },
       huggingface: {
         apiKey: process.env.HUGGINGFACE_API_KEY || '',
@@ -52,10 +42,6 @@ const getConfig = (): AppConfig => {
   // Validate required fields based on provider
   if (config.ai.provider === 'deepseek' && !config.ai.deepseek.apiKey) {
     throw new Error('DEEPSEEK_API_KEY is required when using DeepSeek provider');
-  }
-
-  if (config.ai.provider === 'claude' && !config.ai.claude.apiKey) {
-    throw new Error('ANTHROPIC_API_KEY is required when using Claude provider');
   }
 
   if (config.ai.provider === 'huggingface' && !config.ai.huggingface.apiKey) {

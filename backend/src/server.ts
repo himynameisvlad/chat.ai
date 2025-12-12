@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import { config } from './config/app.config';
 import { DeepSeekService } from './services/ai/deepseek.service';
-import { ClaudeService } from './services/ai/claude.service';
 import { HuggingFaceService } from './services/ai/huggingface.service';
 import { ChatService } from './services/chat.service';
 import { ChatController } from './controllers/chat.controller';
@@ -62,12 +61,6 @@ class Application {
           apiKey: config.ai.deepseek.apiKey,
           baseURL: config.ai.deepseek.baseURL,
           model: config.ai.deepseek.model,
-        });
-      case 'claude':
-        return new ClaudeService({
-          apiKey: config.ai.claude.apiKey,
-          model: config.ai.claude.model,
-          maxTokens: config.ai.claude.maxTokens,
         });
       case 'huggingface':
         return new HuggingFaceService({

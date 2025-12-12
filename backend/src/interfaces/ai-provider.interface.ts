@@ -2,7 +2,7 @@ import { Message, StreamResponse } from '../types';
 
 /**
  * Interface for AI providers following the Interface Segregation Principle.
- * Any AI provider (DeepSeek, OpenAI, Claude, etc.) must implement this contract.
+ * Any AI provider (DeepSeek, OpenAI, HuggingFace, etc.) must implement this contract.
  */
 export interface IAIProvider {
   /**
