@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ChatService } from '../services/chat.service';
-import { ChatRequest } from '../types';
+import { ChatRequest, ExpressStreamResponse } from '../types';
 
 export class ChatController {
   constructor(private chatService: ChatService) {}
@@ -13,7 +13,13 @@ export class ChatController {
     try {
       const { messages, message, customPrompt, temperature } = req.body;
 
-      await this.chatService.processChat(messages, message, res, customPrompt, temperature);
+      await this.chatService.processChat(
+        messages,
+        message,
+        res as ExpressStreamResponse,
+        customPrompt,
+        temperature
+      );
     } catch (error) {
       next(error);
     }

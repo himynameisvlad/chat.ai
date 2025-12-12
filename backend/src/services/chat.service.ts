@@ -1,5 +1,5 @@
 import { IAIProvider } from '../interfaces/ai-provider.interface';
-import { Message, StreamResponse, AppError } from '../types';
+import { Message, StreamResponse, AppError, HISTORY_THRESHOLD, RECENT_MESSAGES_COUNT, MAX_MESSAGE_LENGTH } from '../types';
 
 /**
  * Chat Service - Orchestrates chat operations.
@@ -40,8 +40,8 @@ export class ChatService {
       throw new AppError(400, 'Message is required and cannot be empty');
     }
 
-    if (message.length > 10000) {
-      throw new AppError(400, 'Message is too long (max 10000 characters)');
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      throw new AppError(400, `Message is too long (max ${MAX_MESSAGE_LENGTH} characters)`);
     }
   }
 
@@ -62,13 +62,12 @@ export class ChatService {
   }
 
   private async processHistory(history: Message[]): Promise<Message[]> {
-    if (history.length <= 10) {
+    if (history.length <= HISTORY_THRESHOLD) {
       return history;
     }
 
-    const recentCount = 6;
-    const oldMessages = history.slice(0, -recentCount);
-    const recentMessages = history.slice(-recentCount);
+    const oldMessages = history.slice(0, -RECENT_MESSAGES_COUNT);
+    const recentMessages = history.slice(-RECENT_MESSAGES_COUNT);
 
     const summary = await this.summarizeMessages(oldMessages);
 
@@ -79,7 +78,6 @@ export class ChatService {
   }
 
   private async summarizeMessages(messages: Message[]): Promise<string> {
-    console.log('summarizeMessages');
     const conversationText = messages
       .map(msg => `${msg.role}: ${msg.content}`)
       .join('\n');

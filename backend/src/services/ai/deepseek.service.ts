@@ -1,16 +1,18 @@
 import OpenAI from 'openai';
 import { IAIProvider } from '../../interfaces/ai-provider.interface';
-import { Message, StreamResponse, AppError } from '../../types';
+import { Message, StreamResponse, AppError, DEFAULT_TEMPERATURE } from '../../types';
 
 interface DeepSeekConfig {
   apiKey: string;
   baseURL: string;
   model: string;
+  maxTokens: number;
 }
 
 export class DeepSeekService implements IAIProvider {
   private client: OpenAI;
   private model: string;
+  private maxTokens: number;
 
   constructor(config: DeepSeekConfig) {
     this.client = new OpenAI({
@@ -18,6 +20,7 @@ export class DeepSeekService implements IAIProvider {
       baseURL: config.baseURL,
     });
     this.model = config.model;
+    this.maxTokens = config.maxTokens;
   }
 
   async streamChat(messages: Message[], response: StreamResponse, customPrompt?: string, temperature?: number): Promise<void> {
@@ -35,7 +38,7 @@ export class DeepSeekService implements IAIProvider {
 
       // Filter out any system messages from history to avoid conflicts
       const filteredMessages = messages.filter(msg => msg.role !== 'system');
-      const messagesToSend = [...filteredMessages];
+      const messagesToSend = [systemMessage, ...filteredMessages];
 
       // Convert messages to OpenAI format
       const formattedMessages: OpenAI.Chat.ChatCompletionMessageParam[] =
@@ -48,8 +51,8 @@ export class DeepSeekService implements IAIProvider {
         model: this.model,
         messages: formattedMessages,
         stream: true,
-        temperature: temperature ?? 0.7,
-        max_tokens: 150,
+        temperature: temperature ?? DEFAULT_TEMPERATURE,
+        max_tokens: this.maxTokens,
       });
 
       await this.processStream(stream, response);

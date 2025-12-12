@@ -1,5 +1,6 @@
 import { type Message, type TokenUsage } from '../types';
 import { config } from '../config/app.config';
+import { withRetry } from '../utils/retry';
 
 export class ChatServiceError extends Error {
   public statusCode?: number;
@@ -16,9 +17,11 @@ export class ChatServiceError extends Error {
 
 export class ChatService {
   private readonly baseUrl: string;
+  private readonly timeout: number;
 
-  constructor(baseUrl: string = config.api.baseUrl) {
+  constructor(baseUrl: string = config.api.baseUrl, timeout: number = config.api.timeout) {
     this.baseUrl = baseUrl;
+    this.timeout = timeout;
   }
 
   /**
@@ -38,32 +41,46 @@ export class ChatService {
     customPrompt?: string,
     temperature?: number
   ): Promise<void> {
-    try {
-      const response = await fetch(`${this.baseUrl}/api/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ messages, message, customPrompt, temperature }),
-      });
+    return withRetry(async () => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-      if (!response.ok) {
+      try {
+        const response = await fetch(`${this.baseUrl}/api/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ messages, message, customPrompt, temperature }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new ChatServiceError(
+            `Failed to send message: ${response.statusText}`,
+            response.status
+          );
+        }
+
+        await this.processStream(response, onChunk, onTokens);
+      } catch (error) {
+        clearTimeout(timeoutId);
+
+        if (error instanceof ChatServiceError) {
+          throw error;
+        }
+
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new ChatServiceError('Request timeout - please try again');
+        }
+
         throw new ChatServiceError(
-          `Failed to send message: ${response.statusText}`,
-          response.status
+          error instanceof Error ? error.message : 'An unknown error occurred'
         );
       }
-
-      await this.processStream(response, onChunk, onTokens);
-    } catch (error) {
-      if (error instanceof ChatServiceError) {
-        throw error;
-      }
-
-      throw new ChatServiceError(
-        error instanceof Error ? error.message : 'An unknown error occurred'
-      );
-    }
+    });
   }
 
   /**

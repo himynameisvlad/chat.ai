@@ -5,17 +5,32 @@ import { Message, StreamResponse, AppError } from '../../types';
 interface HuggingFaceConfig {
   apiKey: string;
   model: string;
+  maxTokens: number;
+}
+
+interface HuggingFaceChunk {
+  choices?: Array<{
+    delta?: { content?: string };
+    finish_reason?: string;
+  }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 export class HuggingFaceService implements IAIProvider {
   private client: InferenceClient;
   private model: string;
+  private maxTokens: number;
 
   constructor(config: HuggingFaceConfig) {
     // InferenceClient automatically routes to third-party providers like Featherless AI
     // based on the model name, no need to specify endpointUrl
     this.client = new InferenceClient(config.apiKey);
     this.model = config.model;
+    this.maxTokens = config.maxTokens;
   }
 
   async streamChat(messages: Message[], response: StreamResponse, customPrompt?: string, temperature?: number): Promise<void> {
@@ -32,8 +47,7 @@ export class HuggingFaceService implements IAIProvider {
       const stream = this.client.chatCompletionStream({
         model: this.model,
         messages: formattedMessages,
-        max_tokens: 2048,
-       //  provider: 'featherless-ai', // Use Featherless AI provider
+        max_tokens: this.maxTokens,
       });
 
       // Stream the response chunks
@@ -56,7 +70,7 @@ export class HuggingFaceService implements IAIProvider {
    * Processes the stream and writes chunks to the response
    */
   private async processStream(
-    stream: AsyncIterable<any>,
+    stream: AsyncIterable<HuggingFaceChunk>,
     response: StreamResponse
   ): Promise<void> {
     let streamFinished = false;

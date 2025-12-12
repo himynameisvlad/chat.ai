@@ -8,6 +8,7 @@ interface AppConfig {
   };
   ai: {
     provider: 'deepseek' | 'openai' | 'huggingface';
+    maxTokens: number;
     deepseek: {
       apiKey: string;
       baseURL: string;
@@ -27,6 +28,7 @@ const getConfig = (): AppConfig => {
     },
     ai: {
       provider: (process.env.AI_PROVIDER as 'deepseek' | 'openai' | 'huggingface') || 'deepseek',
+      maxTokens: parseInt(process.env.MAX_TOKENS || '2048', 10),
       deepseek: {
         apiKey: process.env.DEEPSEEK_API_KEY || '',
         baseURL: process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com',

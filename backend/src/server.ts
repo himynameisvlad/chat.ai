@@ -41,11 +41,13 @@ class Application {
           apiKey: config.ai.deepseek.apiKey,
           baseURL: config.ai.deepseek.baseURL,
           model: config.ai.deepseek.model,
+          maxTokens: config.ai.maxTokens,
         });
       case 'huggingface':
         return new HuggingFaceService({
           apiKey: config.ai.huggingface.apiKey,
           model: config.ai.huggingface.model,
+          maxTokens: config.ai.maxTokens,
         });
       // case 'openai':
       //   return new OpenAIService(config.ai.openai);

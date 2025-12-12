@@ -1,6 +1,7 @@
-import { useState, useCallback } from 'react';
-import { type Message, type SessionTokens } from '../types';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { type Message, type SessionTokens, DEFAULT_TEMPERATURE } from '../types';
 import { chatService, ChatServiceError } from '../services/chat.service';
+import { useSessionTokens } from './useSessionTokens';
 
 interface UseChatReturn {
   messages: Message[];
@@ -21,13 +22,14 @@ export function useChat(): UseChatReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
-  const [temperature, setTemperature] = useState(0.7);
-  const [sessionTokens, setSessionTokens] = useState<SessionTokens>({
-    total_prompt_tokens: 0,
-    total_completion_tokens: 0,
-    total_tokens: 0,
-    message_count: 0,
-  });
+  const [temperature, setTemperature] = useState(DEFAULT_TEMPERATURE);
+  const { sessionTokens, updateTokens, resetTokens } = useSessionTokens();
+
+  const messagesRef = useRef<Message[]>(messages);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const sendMessage = useCallback(
     async (message: string) => {
@@ -48,11 +50,9 @@ export function useChat(): UseChatReturn {
         content: '',
       };
 
-      const conversationHistory = messages;
-
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
 
-      const cleanHistory = conversationHistory
+      const cleanHistory = messagesRef.current
         .filter((msg) => msg.content.trim().length > 0)
         .map((msg) => ({
           role: msg.role,
@@ -93,12 +93,7 @@ export function useChat(): UseChatReturn {
               return updated;
             });
 
-            setSessionTokens((prev) => ({
-              total_prompt_tokens: prev.total_prompt_tokens + usage.prompt_tokens,
-              total_completion_tokens: prev.total_completion_tokens + usage.completion_tokens,
-              total_tokens: prev.total_tokens + usage.total_tokens,
-              message_count: prev.message_count + 1,
-            }));
+            updateTokens(usage);
           },
           customPrompt || undefined,
           temperature
@@ -126,7 +121,7 @@ export function useChat(): UseChatReturn {
         setIsLoading(false);
       }
     },
-    [isLoading, customPrompt, temperature, messages]
+    [isLoading, customPrompt, temperature]
   );
 
   const clearError = useCallback(() => {
@@ -135,13 +130,8 @@ export function useChat(): UseChatReturn {
 
   const resetSession = useCallback(() => {
     setMessages([]);
-    setSessionTokens({
-      total_prompt_tokens: 0,
-      total_completion_tokens: 0,
-      total_tokens: 0,
-      message_count: 0,
-    });
-  }, []);
+    resetTokens();
+  }, [resetTokens]);
 
   return {
     messages,
