@@ -5,9 +5,6 @@ import { ChatRequest } from '../types';
 export class ChatController {
   constructor(private chatService: ChatService) {}
 
-  /**
-   * Handles POST /api/chat requests
-   */
   handleChat = async (
     req: Request<{}, {}, ChatRequest>,
     res: Response,
@@ -22,9 +19,6 @@ export class ChatController {
     }
   };
 
-  /**
-   * Handles GET /api/health requests
-   */
   handleHealth = (req: Request, res: Response): void => {
     res.json({
       status: 'ok',

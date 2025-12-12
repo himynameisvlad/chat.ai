@@ -39,7 +39,6 @@ const getConfig = (): AppConfig => {
     },
   };
 
-  // Validate required fields based on provider
   if (config.ai.provider === 'deepseek' && !config.ai.deepseek.apiKey) {
     throw new Error('DEEPSEEK_API_KEY is required when using DeepSeek provider');
   }

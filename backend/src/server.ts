@@ -9,10 +9,6 @@ import { createChatRoutes } from './routes/chat.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { IAIProvider } from './interfaces/ai-provider.interface';
 
-/**
- * Application entry point.
- * Follows Dependency Injection pattern - all dependencies are created and injected here.
- */
 class Application {
   private app: express.Application;
   private aiProvider!: IAIProvider;
@@ -27,33 +23,17 @@ class Application {
     this.setupErrorHandling();
   }
 
-  /**
-   * Sets up Express middleware
-   */
   private setupMiddleware(): void {
     this.app.use(cors());
     this.app.use(express.json());
   }
 
-  /**
-   * Initializes all dependencies using Dependency Injection.
-   * This is where we wire up our services following the SOLID principles.
-   */
   private initializeDependencies(): void {
-    // Initialize AI provider based on configuration
     this.aiProvider = this.createAIProvider();
-
-    // Inject AI provider into Chat Service
     this.chatService = new ChatService(this.aiProvider);
-
-    // Inject Chat Service into Controller
     this.chatController = new ChatController(this.chatService);
   }
 
-  /**
-   * Factory method to create AI provider based on configuration.
-   * Follows Factory Pattern and Open/Closed Principle - easy to add new providers.
-   */
   private createAIProvider(): IAIProvider {
     switch (config.ai.provider) {
       case 'deepseek':
@@ -67,7 +47,6 @@ class Application {
           apiKey: config.ai.huggingface.apiKey,
           model: config.ai.huggingface.model,
         });
-      // Easy to add more providers in the future:
       // case 'openai':
       //   return new OpenAIService(config.ai.openai);
       default:
@@ -75,25 +54,17 @@ class Application {
     }
   }
 
-  /**
-   * Sets up application routes
-   */
   private setupRoutes(): void {
     const chatRoutes = createChatRoutes(this.chatController);
     this.app.use('/api', chatRoutes);
   }
 
-  /**
-   * Sets up error handling middleware (must be last)
-   */
+  // Must be called last
   private setupErrorHandling(): void {
     this.app.use(notFoundHandler);
     this.app.use(errorHandler);
   }
 
-  /**
-   * Starts the Express server
-   */
   public start(): void {
     this.app.listen(config.server.port, () => {
       console.log(`🚀 Server running on http://localhost:${config.server.port}`);
@@ -103,6 +74,5 @@ class Application {
   }
 }
 
-// Bootstrap the application
 const app = new Application();
 app.start();

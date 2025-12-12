@@ -22,8 +22,6 @@ export function useChat(): UseChatReturn {
   const [error, setError] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
   const [temperature, setTemperature] = useState(0.7);
-
-  // Session-level token tracking
   const [sessionTokens, setSessionTokens] = useState<SessionTokens>({
     total_prompt_tokens: 0,
     total_completion_tokens: 0,
@@ -31,20 +29,15 @@ export function useChat(): UseChatReturn {
     message_count: 0,
   });
 
-  /**
-   * Sends a message to the chat API
-   */
   const sendMessage = useCallback(
     async (message: string) => {
       if (!message.trim() || isLoading) {
         return;
       }
 
-      // Set loading state IMMEDIATELY to prevent duplicate calls
       setIsLoading(true);
       setError(null);
 
-      // Add user message to UI immediately
       const userMessage: Message = {
         role: 'user',
         content: message.trim(),
@@ -70,7 +63,6 @@ export function useChat(): UseChatReturn {
         await chatService.sendMessage(
           cleanHistory,
           message.trim(),
-          // Text chunk callback
           (chunk) => {
             setMessages((prev) => {
               const updated = [...prev];
@@ -86,9 +78,7 @@ export function useChat(): UseChatReturn {
               return updated;
             });
           },
-          // Token usage callback
           (usage) => {
-            // Update the last message with token data
             setMessages((prev) => {
               const updated = [...prev];
               const lastIndex = updated.length - 1;
@@ -103,7 +93,6 @@ export function useChat(): UseChatReturn {
               return updated;
             });
 
-            // Update session totals
             setSessionTokens((prev) => ({
               total_prompt_tokens: prev.total_prompt_tokens + usage.prompt_tokens,
               total_completion_tokens: prev.total_completion_tokens + usage.completion_tokens,
@@ -122,7 +111,6 @@ export function useChat(): UseChatReturn {
 
         setError(errorMessage);
 
-        // Update the last message with error
         setMessages((prev) => {
           const updated = [...prev];
           const lastMessage = updated[updated.length - 1];
