@@ -1,10 +1,14 @@
 import dotenv from 'dotenv';
+import path from 'path';
 
 dotenv.config();
 
 interface AppConfig {
   server: {
     port: number;
+  };
+  database: {
+    path: string;
   };
   ai: {
     provider: 'deepseek' | 'openai' | 'huggingface';
@@ -25,6 +29,9 @@ const getConfig = (): AppConfig => {
   const config: AppConfig = {
     server: {
       port: parseInt(process.env.PORT || '3001', 10),
+    },
+    database: {
+      path: process.env.DB_PATH || path.join(process.cwd(), 'data', 'chat.db'),
     },
     ai: {
       provider: (process.env.AI_PROVIDER as 'deepseek' | 'openai' | 'huggingface') || 'deepseek',

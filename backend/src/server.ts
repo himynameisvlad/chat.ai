@@ -8,6 +8,7 @@ import { ChatController } from './controllers/chat.controller';
 import { createChatRoutes } from './routes/chat.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { IAIProvider } from './interfaces/ai-provider.interface';
+import { initializeDatabase, disconnect } from './database/database';
 
 class Application {
   private app: express.Application;
@@ -67,12 +68,39 @@ class Application {
     this.app.use(errorHandler);
   }
 
-  public start(): void {
-    this.app.listen(config.server.port, () => {
-      console.log(`🚀 Server running on http://localhost:${config.server.port}`);
-      console.log(`🤖 AI Provider: ${this.aiProvider.getProviderName()}`);
-      console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-    });
+  public async start(): Promise<void> {
+    try {
+      await initializeDatabase();
+
+      this.app.listen(config.server.port, () => {
+        console.log(`🚀 Server running on http://localhost:${config.server.port}`);
+        console.log(`🤖 AI Provider: ${this.aiProvider.getProviderName()}`);
+        console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+      });
+
+      this.setupGracefulShutdown();
+    } catch (error) {
+      console.error('Failed to start server:', error);
+      process.exit(1);
+    }
+  }
+
+  private setupGracefulShutdown(): void {
+    const shutdown = async (signal: string) => {
+      console.log(`\n${signal} received. Starting graceful shutdown...`);
+
+      try {
+        await disconnect();
+        console.log('✅ Graceful shutdown completed');
+        process.exit(0);
+      } catch (error) {
+        console.error('Error during shutdown:', error);
+        process.exit(1);
+      }
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   }
 }
 

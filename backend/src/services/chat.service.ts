@@ -1,5 +1,6 @@
 import { IAIProvider } from '../interfaces/ai-provider.interface';
 import { Message, StreamResponse, AppError, HISTORY_THRESHOLD, RECENT_MESSAGES_COUNT, MAX_MESSAGE_LENGTH } from '../types';
+import { summaryRepository } from '../database/summary.repository';
 
 /**
  * Chat Service - Orchestrates chat operations.
@@ -62,17 +63,32 @@ export class ChatService {
   }
 
   private async processHistory(history: Message[]): Promise<Message[]> {
+    const existingSummary = await summaryRepository.getLatestSummary();
+
     if (history.length <= HISTORY_THRESHOLD) {
+      if (existingSummary) {
+        return [
+          { role: 'system' as const, content: existingSummary.summary_text },
+          ...history
+        ];
+      }
       return history;
     }
 
     const oldMessages = history.slice(0, -RECENT_MESSAGES_COUNT);
     const recentMessages = history.slice(-RECENT_MESSAGES_COUNT);
 
-    const summary = await this.summarizeMessages(oldMessages);
+    let summary: string;
+
+    if (existingSummary && existingSummary.message_count >= oldMessages.length - 2) {
+      summary = existingSummary.summary_text;
+    } else {
+      summary = await this.summarizeMessages(oldMessages);
+      await summaryRepository.saveSummary(summary, oldMessages.length);
+    }
 
     return [
-      { role: 'system' as const, content: `Previous conversation summary: ${summary}` },
+      { role: 'system' as const, content: summary },
       ...recentMessages
     ];
   }
