@@ -28,21 +28,19 @@ export class DeepSeekService implements IAIProvider {
       // Set headers for Server-Sent Events (SSE)
       this.setStreamHeaders(response);
 
-      // Always add system prompt (use custom if provided, otherwise use default)
-      const systemPromptContent = customPrompt || this.getDefaultSystemPrompt();
+     // const systemPromptContent = customPrompt || this.getDefaultSystemPrompt();
 
-      const systemMessage: Message = {
-        role: 'system',
-        content: systemPromptContent,
-      };
+      // const systemMessage: Message = {
+      //   role: 'system',
+      //   content: systemPromptContent,
+      // };
 
-      // Filter out any system messages from history to avoid conflicts
-      const filteredMessages = messages.filter(msg => msg.role !== 'system');
-      const messagesToSend = [systemMessage, ...filteredMessages];
+      // const filteredMessages = messages.filter(msg => msg.role !== 'system');
+      // const messagesToSend = [systemMessage, ...filteredMessages];
 
       // Convert messages to OpenAI format
       const formattedMessages: OpenAI.Chat.ChatCompletionMessageParam[] =
-        messagesToSend.map((msg) => ({
+        messages.map((msg) => ({
           role: msg.role as 'user' | 'assistant' | 'system',
           content: msg.content,
         }));
