@@ -3,12 +3,24 @@ import path from 'path';
 
 dotenv.config();
 
+export interface MCPServerConfig {
+  name: string;
+  enabled: boolean;
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+}
+
 interface AppConfig {
   server: {
     port: number;
   };
   database: {
     path: string;
+  };
+  mcp: {
+    enabled: boolean;
+    servers: MCPServerConfig[];
   };
   ai: {
     provider: 'deepseek' | 'openai' | 'huggingface';
@@ -26,12 +38,46 @@ interface AppConfig {
 }
 
 const getConfig = (): AppConfig => {
+  const mcpServers: MCPServerConfig[] = [];
+
+  // Google Maps MCP Server
+  if (process.env.MCP_GOOGLE_MAPS_ENABLED === 'true') {
+    const googleMapsEnv: Record<string, string> = {};
+    if (process.env.MCP_GOOGLE_MAPS_API_KEY) {
+      googleMapsEnv.GOOGLE_MAPS_API_KEY = process.env.MCP_GOOGLE_MAPS_API_KEY;
+    }
+
+    mcpServers.push({
+      name: 'google-maps',
+      enabled: true,
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-google-maps'],
+      env: Object.keys(googleMapsEnv).length > 0 ? googleMapsEnv : undefined,
+    });
+  }
+
+  // Add more MCP servers here as needed
+  // Example:
+  // if (process.env.MCP_CUSTOM_SERVER_ENABLED === 'true') {
+  //   mcpServers.push({
+  //     name: 'custom-server',
+  //     enabled: true,
+  //     command: 'npx',
+  //     args: ['-y', '@modelcontextprotocol/server-custom'],
+  //     env: { API_KEY: process.env.MCP_CUSTOM_API_KEY },
+  //   });
+  // }
+
   const config: AppConfig = {
     server: {
       port: parseInt(process.env.PORT || '3001', 10),
     },
     database: {
       path: process.env.DB_PATH || path.join(process.cwd(), 'data', 'chat.db'),
+    },
+    mcp: {
+      enabled: mcpServers.length > 0,
+      servers: mcpServers,
     },
     ai: {
       provider: (process.env.AI_PROVIDER as 'deepseek' | 'openai' | 'huggingface') || 'deepseek',
