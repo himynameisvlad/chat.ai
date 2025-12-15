@@ -58,3 +58,6 @@ coverage/
 
 # Optional eslint cache
 .eslintcache
+
+# Database
+backend/data/
