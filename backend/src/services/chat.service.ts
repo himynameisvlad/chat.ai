@@ -1,14 +1,15 @@
 import { IAIProvider } from '../interfaces/ai-provider.interface';
 import { Message, StreamResponse, AppError, HISTORY_THRESHOLD, RECENT_MESSAGES_COUNT, MAX_MESSAGE_LENGTH } from '../types';
 import { summaryRepository } from '../database/summary.repository';
+import { conversationRequiresTools, isToolsListRequest } from '../utils/tool-detection.util';
+import { config } from '../config/app.config';
+import { mcpToolsService } from './mcp/mcp-tools.service';
 
-/**
- * Chat Service - Orchestrates chat operations.
- * Follows Dependency Injection principle - receives AI provider via constructor.
- * Follows Single Responsibility Principle - only handles chat orchestration logic.
- */
 export class ChatService {
-  constructor(private aiProvider: IAIProvider) {}
+  constructor(
+    private aiProvider: IAIProvider,
+    private deepSeekProvider?: IAIProvider
+  ) {}
 
   /**
    * Processes a chat request and streams the response
@@ -27,10 +28,67 @@ export class ChatService {
   ): Promise<void> {
     this.validateMessage(newMessage);
 
+    // Check if user is requesting tools list
+    if (isToolsListRequest(newMessage)) {
+      await this.handleToolsListRequest(response);
+      return;
+    }
+
     const processedHistory = await this.processHistory(conversationHistory);
     const messages = this.buildConversation(processedHistory, newMessage);
 
-    await this.aiProvider.streamChat(messages, response, customPrompt, temperature);
+    const needsTools = conversationRequiresTools(messages);
+    const mcpEnabled = config.mcp.enabled;
+
+    // Route to DeepSeek if tools are needed and MCP is enabled
+    if (needsTools && mcpEnabled && this.deepSeekProvider) {
+      console.log('🔧 Routing to DeepSeek for MCP tool usage');
+      await this.deepSeekProvider.streamChat(messages, response, customPrompt, temperature);
+    } else {
+      await this.aiProvider.streamChat(messages, response, customPrompt, temperature);
+    }
+  }
+
+  private async handleToolsListRequest(response: StreamResponse): Promise<void> {
+    response.setHeader('Content-Type', 'text/event-stream');
+    response.setHeader('Cache-Control', 'no-cache');
+    response.setHeader('Connection', 'keep-alive');
+
+    if (!config.mcp.enabled || !mcpToolsService.hasTools()) {
+      const message = 'No MCP tools are currently available. Enable MCP servers in configuration to use tools.';
+      response.write(`data: ${JSON.stringify({ text: message })}\n\n`);
+      response.write('data: [DONE]\n\n');
+      response.end();
+      return;
+    }
+
+    const tools = mcpToolsService.getTools();
+
+    // Group tools by server
+    const toolsByServer = tools.reduce((acc, tool) => {
+      if (!acc[tool.serverName]) {
+        acc[tool.serverName] = [];
+      }
+      acc[tool.serverName].push(tool);
+      return acc;
+    }, {} as Record<string, typeof tools>);
+
+    let responseText = `🛠️ Available MCP Tools (${tools.length}):\n\n`;
+
+    Object.entries(toolsByServer).forEach(([serverName, serverTools]) => {
+      responseText += `**${serverName}** (${serverTools.length} tools):\n`;
+      serverTools.forEach((tool, index) => {
+        responseText += `  ${index + 1}. **${tool.name}**\n`;
+        if (tool.description) {
+          responseText += `     ${tool.description}\n`;
+        }
+      });
+      responseText += '\n';
+    });
+
+    response.write(`data: ${JSON.stringify({ text: responseText })}\n\n`);
+    response.write('data: [DONE]\n\n');
+    response.end();
   }
 
   /**
