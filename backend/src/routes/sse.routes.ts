@@ -10,7 +10,7 @@ router.get('/status', (req, res) => sseController.getStatus(req, res));
 
 router.get('/trigger-toast', async (req, res) => {
   try {
-    await cronService.triggerDailyToastNow();
+    await cronService.executeTask('daily-toast');
     res.json({
       success: true,
       message: 'Toast triggered successfully'

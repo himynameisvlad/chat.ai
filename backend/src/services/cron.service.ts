@@ -1,42 +1,54 @@
 import * as cron from 'node-cron';
-import { toastService } from './toast.service';
+import { ITask } from '../tasks/base.task';
 
 export class CronService {
-  private tasks: cron.ScheduledTask[] = [];
+  private scheduledTasks: Map<string, cron.ScheduledTask> = new Map();
+  private registeredTasks: Map<string, ITask> = new Map();
 
-  /**
-   * Starts all cron jobs
-   */
-  start(): void {
-    // Daily toast at 9:00 AM
-    const dailyToastTask = cron.schedule('0 9 * * *', async () => {
-      console.log('⏰ Running daily toast cron job');
-      try {
-        await toastService.broadcastDailyToast();
-      } catch (error) {
-        console.error('Failed to broadcast daily toast:', error);
-      }
-    });
-
-    this.tasks.push(dailyToastTask);
-    console.log('⏰ Cron jobs started (Daily toast: 9:00 AM)');
+  registerTask(task: ITask): void {
+    this.registeredTasks.set(task.name, task);
+    console.log(`⏰ Task registered: ${task.name} (${task.schedule})`);
   }
 
-  /**
-   * Stops all cron jobs
-   */
+  start(): void {
+    if (this.registeredTasks.size === 0) {
+      console.log('⏰ No tasks to schedule');
+      return;
+    }
+
+    for (const [name, task] of this.registeredTasks.entries()) {
+      const scheduledTask = cron.schedule(task.schedule, async () => {
+        try {
+          await task.execute();
+        } catch (error) {
+          console.error(`Failed to execute task ${name}:`, error);
+        }
+      });
+
+      this.scheduledTasks.set(name, scheduledTask);
+    }
+
+    console.log(`⏰ Started ${this.scheduledTasks.size} cron job(s)`);
+  }
+
   stop(): void {
-    this.tasks.forEach(task => task.stop());
-    this.tasks = [];
+    this.scheduledTasks.forEach(task => task.stop());
+    this.scheduledTasks.clear();
     console.log('⏰ All cron jobs stopped');
   }
 
-  /**
-   * Triggers the daily toast immediately (for testing)
-   */
-  async triggerDailyToastNow(): Promise<void> {
-    console.log('⏰ Manually triggering daily toast');
-    await toastService.broadcastDailyToast();
+  async executeTask(taskName: string): Promise<void> {
+    const task = this.registeredTasks.get(taskName);
+    if (!task) {
+      throw new Error(`Task not found: ${taskName}`);
+    }
+
+    console.log(`⏰ Manually executing task: ${taskName}`);
+    await task.execute();
+  }
+
+  getRegisteredTasks(): string[] {
+    return Array.from(this.registeredTasks.keys());
   }
 }
 
