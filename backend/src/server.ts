@@ -14,7 +14,7 @@ import { initializeDatabase, disconnect } from './database/database';
 import { mcpToolsService } from './services/mcp/mcp-tools.service';
 import { mcpClientService } from './services/mcp/mcp-client.service';
 import { cronService } from './services/cron.service';
-import { tasks } from './tasks';
+import { DailyToastTask } from './tasks/daily-toast.task';
 
 class Application {
   private app: express.Application;
@@ -113,7 +113,8 @@ class Application {
         console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
       });
 
-      tasks.forEach(task => cronService.registerTask(task));
+      const dailyToastTask = new DailyToastTask(this.chatService);
+      cronService.registerTask(dailyToastTask);
       cronService.start();
 
       this.setupGracefulShutdown();
