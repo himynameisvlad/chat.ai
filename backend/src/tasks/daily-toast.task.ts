@@ -5,7 +5,7 @@ import { pokemonRepository } from '../database/pokemon.repository';
 
 export class DailyToastTask implements ITask {
   name = 'daily-toast';
-  schedule = '50 14 * * *';
+  schedule = '52 18 * * *';
 
   constructor(private chatService: ChatService) {}
 
