@@ -1,9 +1,9 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { config } from '../config/app.config';
 
-export interface SSEEvent {
-  type: string;
-  [key: string]: any;
+export interface ConnectedEvent {
+  type: 'connected';
+  connectionId: string;
 }
 
 export interface ToastEvent {
@@ -11,6 +11,8 @@ export interface ToastEvent {
   message: string;
   timestamp: string;
 }
+
+export type SSEEvent = ConnectedEvent | ToastEvent;
 
 interface UseSSEOptions {
   onToast?: (toast: ToastEvent) => void;
@@ -56,7 +58,7 @@ export const useSSE = (options: UseSSEOptions = {}) => {
           if (data.type === 'connected' && onConnected) {
             onConnected(data.connectionId);
           } else if (data.type === 'toast' && onToast) {
-            onToast(data as ToastEvent);
+            onToast(data);
           }
         } catch (error) {
           console.error('Failed to parse SSE message:', error);
