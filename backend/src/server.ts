@@ -15,6 +15,7 @@ import { mcpToolsService } from './services/mcp/mcp-tools.service';
 import { mcpClientService } from './services/mcp/mcp-client.service';
 import { cronService } from './services/cron.service';
 import { DailyToastTask } from './tasks/daily-toast.task';
+import { FetchPokemonTask } from './tasks/fetch-pokemon.task';
 
 class Application {
   private app: express.Application;
@@ -113,7 +114,9 @@ class Application {
         console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
       });
 
+      const fetchPokemonTask = new FetchPokemonTask(this.chatService);
       const dailyToastTask = new DailyToastTask(this.chatService);
+      cronService.registerTask(fetchPokemonTask);
       cronService.registerTask(dailyToastTask);
       cronService.start();
 
