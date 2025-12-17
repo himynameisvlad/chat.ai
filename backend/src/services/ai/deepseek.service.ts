@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { IAIProvider } from '../../interfaces/ai-provider.interface';
 import { Message, StreamResponse, AppError, DEFAULT_TEMPERATURE } from '../../types';
+import { mcpToolsService } from '../mcp/mcp-tools.service';
 
 interface DeepSeekConfig {
   apiKey: string;
@@ -23,7 +24,13 @@ export class DeepSeekService implements IAIProvider {
     this.maxTokens = config.maxTokens;
   }
 
-  async streamChat(messages: Message[], response: StreamResponse, customPrompt?: string, temperature?: number): Promise<void> {
+  async streamChat(
+    messages: Message[],
+    response: StreamResponse,
+    customPrompt?: string,
+    temperature?: number,
+    tools?: OpenAI.Chat.ChatCompletionTool[]
+  ): Promise<void> {
     try {
       // Set headers for Server-Sent Events (SSE)
       this.setStreamHeaders(response);
@@ -45,15 +52,23 @@ export class DeepSeekService implements IAIProvider {
           content: msg.content,
         }));
 
-      const stream = await this.client.chat.completions.create({
+      const requestParams: OpenAI.Chat.ChatCompletionCreateParams = {
         model: this.model,
         messages: formattedMessages,
         stream: true,
         temperature: temperature ?? DEFAULT_TEMPERATURE,
         max_tokens: this.maxTokens,
-      });
+      };
 
-      await this.processStream(stream, response);
+      // Add tools if provided
+      if (tools && tools.length > 0) {
+        requestParams.tools = tools;
+        requestParams.tool_choice = 'auto';
+      }
+
+      const stream = await this.client.chat.completions.create(requestParams);
+
+      await this.processStream(stream, response, tools);
     } catch (error) {
       this.handleStreamError(error, response);
     }
@@ -77,14 +92,36 @@ export class DeepSeekService implements IAIProvider {
    */
   private async processStream(
     stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>,
-    response: StreamResponse
+    response: StreamResponse,
+    tools?: OpenAI.Chat.ChatCompletionTool[]
   ): Promise<void> {
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content;
+    const toolCalls: Record<number, { name: string; arguments: string }> = {};
 
+    for await (const chunk of stream) {
+      const choice = chunk.choices[0];
+      const content = choice?.delta?.content;
+
+      // Handle regular content
       if (content) {
         const data = JSON.stringify({ text: content });
         response.write(`data: ${data}\n\n`);
+      }
+
+      // Handle tool calls
+      if (choice?.delta?.tool_calls) {
+        for (const toolCall of choice.delta.tool_calls) {
+          const index = toolCall.index;
+          if (!toolCalls[index]) {
+            toolCalls[index] = { name: '', arguments: '' };
+          }
+
+          if (toolCall.function?.name) {
+            toolCalls[index].name = toolCall.function.name;
+          }
+          if (toolCall.function?.arguments) {
+            toolCalls[index].arguments += toolCall.function.arguments;
+          }
+        }
       }
 
       // Send token usage when available (typically in final chunk)
@@ -100,12 +137,66 @@ export class DeepSeekService implements IAIProvider {
         response.write(`data: ${tokenData}\n\n`);
       }
 
-      if (chunk.choices[0]?.finish_reason === 'stop') {
+      if (choice?.finish_reason === 'tool_calls' && Object.keys(toolCalls).length > 0) {
+        // Execute tool calls and send results
+        await this.handleToolCalls(toolCalls, response, tools);
+        return;
+      }
+
+      if (choice?.finish_reason === 'stop') {
         response.write('data: [DONE]\n\n');
       }
     }
 
     response.end();
+  }
+
+  /**
+   * Handles tool calls by executing them and streaming the response
+   */
+  private async handleToolCalls(
+    toolCalls: Record<number, { name: string; arguments: string }>,
+    response: StreamResponse,
+    tools?: OpenAI.Chat.ChatCompletionTool[]
+  ): Promise<void> {
+    try {
+      // Notify user that tools are being executed
+      response.write(`data: ${JSON.stringify({ text: '\n\n🔧 Using tools...\n\n' })}\n\n`);
+
+      // Execute all tool calls
+      const toolResults: Array<{ name: string; result: any }> = [];
+      for (const [index, toolCall] of Object.entries(toolCalls)) {
+        const { name, arguments: argsStr } = toolCall;
+
+        try {
+          const args = JSON.parse(argsStr);
+          console.log(`Executing tool: ${name}`, args);
+
+          const result = await mcpToolsService.executeTool(name, args);
+          toolResults.push({ name, result });
+
+          response.write(`data: ${JSON.stringify({ text: `✓ ${name}\n` })}\n\n`);
+        } catch (error) {
+          console.error(`Error executing tool ${name}:`, error);
+          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+          toolResults.push({ name, result: { error: errorMsg } });
+          response.write(`data: ${JSON.stringify({ text: `✗ ${name}: ${errorMsg}\n` })}\n\n`);
+        }
+      }
+
+      // Format tool results for display
+      response.write(`data: ${JSON.stringify({ text: '\n' })}\n\n`);
+      for (const { name, result } of toolResults) {
+        const resultStr = JSON.stringify(result, null, 2);
+        response.write(`data: ${JSON.stringify({ text: resultStr + '\n\n' })}\n\n`);
+      }
+
+      response.write('data: [DONE]\n\n');
+      response.end();
+    } catch (error) {
+      console.error('Error handling tool calls:', error);
+      this.handleStreamError(error, response);
+    }
   }
 
   /**

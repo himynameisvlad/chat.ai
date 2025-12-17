@@ -3,13 +3,23 @@ import path from 'path';
 
 dotenv.config();
 
-export interface MCPServerConfig {
+export interface MCPServerConfigStdio {
   name: string;
   enabled: boolean;
+  transport: 'stdio';
   command: string;
   args: string[];
   env?: Record<string, string>;
 }
+
+export interface MCPServerConfigHTTP {
+  name: string;
+  enabled: boolean;
+  transport: 'http';
+  url: string;
+}
+
+export type MCPServerConfig = MCPServerConfigStdio | MCPServerConfigHTTP;
 
 interface AppConfig {
   server: {
@@ -40,33 +50,37 @@ interface AppConfig {
 const getConfig = (): AppConfig => {
   const mcpServers: MCPServerConfig[] = [];
 
-  // Google Maps MCP Server
-  if (process.env.MCP_GOOGLE_MAPS_ENABLED === 'true') {
-    const googleMapsEnv: Record<string, string> = {};
-    if (process.env.MCP_GOOGLE_MAPS_API_KEY) {
-      googleMapsEnv.GOOGLE_MAPS_API_KEY = process.env.MCP_GOOGLE_MAPS_API_KEY;
-    }
-
-    mcpServers.push({
-      name: 'google-maps',
-      enabled: true,
-      command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-google-maps'],
-      env: Object.keys(googleMapsEnv).length > 0 ? googleMapsEnv : undefined,
-    });
-  }
-
-  // Add more MCP servers here as needed
-  // Example:
+  // Add MCP servers here as needed
+  // Example for stdio transport:
   // if (process.env.MCP_CUSTOM_SERVER_ENABLED === 'true') {
   //   mcpServers.push({
   //     name: 'custom-server',
   //     enabled: true,
+  //     transport: 'stdio',
   //     command: 'npx',
   //     args: ['-y', '@modelcontextprotocol/server-custom'],
   //     env: { API_KEY: process.env.MCP_CUSTOM_API_KEY },
   //   });
   // }
+  //
+  // Example for HTTP transport:
+  // if (process.env.MCP_HTTP_SERVER_ENABLED === 'true') {
+  //   mcpServers.push({
+  //     name: 'http-server',
+  //     enabled: true,
+  //     transport: 'http',
+  //     url: process.env.MCP_HTTP_SERVER_URL || 'http://localhost:8080',
+  //   });
+  // }
+
+  if (process.env.MCP_POKEMON_SERVER_ENABLED === 'true') {
+    mcpServers.push({
+      name: 'http-server',
+      enabled: true,
+      transport: 'http',
+      url: process.env.MCP_POKEMON_SERVER_URL || '',
+    });
+  }
 
   const config: AppConfig = {
     server: {

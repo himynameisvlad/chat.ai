@@ -1,7 +1,6 @@
 import { IAIProvider } from '../interfaces/ai-provider.interface';
 import { Message, StreamResponse, AppError, HISTORY_THRESHOLD, RECENT_MESSAGES_COUNT, MAX_MESSAGE_LENGTH } from '../types';
 import { summaryRepository } from '../database/summary.repository';
-import { conversationRequiresTools, isToolsListRequest } from '../utils/tool-detection.util';
 import { config } from '../config/app.config';
 import { mcpToolsService } from './mcp/mcp-tools.service';
 
@@ -28,24 +27,20 @@ export class ChatService {
   ): Promise<void> {
     this.validateMessage(newMessage);
 
-    // Check if user is requesting tools list
-    if (isToolsListRequest(newMessage)) {
-      await this.handleToolsListRequest(response);
-      return;
-    }
-
     const processedHistory = await this.processHistory(conversationHistory);
     const messages = this.buildConversation(processedHistory, newMessage);
 
-    const needsTools = conversationRequiresTools(messages);
-    const mcpEnabled = config.mcp.enabled;
+    const mcpEnabled = config.mcp.enabled && mcpToolsService.hasTools();
 
-    // Route to DeepSeek if tools are needed and MCP is enabled
-    if (needsTools && mcpEnabled && this.deepSeekProvider) {
-      console.log('🔧 Routing to DeepSeek for MCP tool usage');
-      await this.deepSeekProvider.streamChat(messages, response, customPrompt, temperature);
+    // Route to DeepSeek if MCP is enabled and tools are available
+    // DeepSeek will decide whether to use tools based on the conversation context
+    if (mcpEnabled && this.deepSeekProvider) {
+      console.log('🔧 Using DeepSeek with MCP tools available');
+      const tools = mcpToolsService.convertToOpenAIFormat();
+      await this.deepSeekProvider.streamChat(messages, response, customPrompt, temperature, tools);
     } else {
-      await this.aiProvider.streamChat(messages, response, customPrompt, temperature);
+      const tools = mcpToolsService.convertToOpenAIFormat();
+      await this.aiProvider.streamChat(messages, response, customPrompt, temperature, tools);
     }
   }
 

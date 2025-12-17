@@ -1,5 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { config, MCPServerConfig } from '../../config/app.config';
 
 export interface MCPTool {
@@ -11,7 +13,7 @@ export interface MCPTool {
 
 interface MCPClientConnection {
   client: Client;
-  transport: StdioClientTransport;
+  transport: Transport;
   serverConfig: MCPServerConfig;
 }
 
@@ -40,25 +42,32 @@ export class MCPClientService {
   }
 
   private async connectToServer(serverConfig: MCPServerConfig): Promise<void> {
-    const env: Record<string, string> = {};
+    let transport: Transport;
 
-    // Copy process.env
-    for (const [key, value] of Object.entries(process.env)) {
-      if (value !== undefined) {
-        env[key] = value;
+    if (serverConfig.transport === 'stdio') {
+      const env: Record<string, string> = {};
+
+      // Copy process.env
+      for (const [key, value] of Object.entries(process.env)) {
+        if (value !== undefined) {
+          env[key] = value;
+        }
       }
-    }
 
-    // Add server-specific env vars
-    if (serverConfig.env) {
-      Object.assign(env, serverConfig.env);
-    }
+      // Add server-specific env vars
+      if (serverConfig.env) {
+        Object.assign(env, serverConfig.env);
+      }
 
-    const transport = new StdioClientTransport({
-      command: serverConfig.command,
-      args: serverConfig.args,
-      env,
-    });
+      transport = new StdioClientTransport({
+        command: serverConfig.command,
+        args: serverConfig.args,
+        env,
+      });
+    } else {
+      // HTTP transport
+      transport = new StreamableHTTPClientTransport(new URL(serverConfig.url));
+    }
 
     const client = new Client({
       name: 'chat-ai-backend',
@@ -75,7 +84,7 @@ export class MCPClientService {
       serverConfig,
     });
 
-    console.log(`✅ Connected to ${serverConfig.name} MCP`);
+    console.log(`✅ Connected to ${serverConfig.name} MCP via ${serverConfig.transport}`);
   }
 
   async disconnect(): Promise<void> {
