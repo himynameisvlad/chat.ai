@@ -34,9 +34,22 @@ export class ChatService {
     // Route to DeepSeek if MCP is enabled and tools are available
     // DeepSeek will decide whether to use tools based on the conversation context
     if (mcpEnabled && this.deepSeekProvider) {
-      console.log('🔧 Using DeepSeek with MCP tools available');
+      console.log('🔧 Using DeepSeek with MCP tools and chaining enabled');
       const tools = mcpToolsService.convertToOpenAIFormat();
-      await this.deepSeekProvider.streamChat(messages, response, customPrompt, temperature, tools);
+
+      // Use chaining if available
+      if ('streamChatWithChaining' in this.deepSeekProvider) {
+        await (this.deepSeekProvider as any).streamChatWithChaining(
+          messages,
+          response,
+          customPrompt,
+          temperature,
+          tools,
+          { maxIterations: 5, verbose: true }
+        );
+      } else {
+        await this.deepSeekProvider.streamChat(messages, response, customPrompt, temperature, tools);
+      }
     } else {
       const tools = mcpToolsService.convertToOpenAIFormat();
       await this.aiProvider.streamChat(messages, response, customPrompt, temperature, tools);
