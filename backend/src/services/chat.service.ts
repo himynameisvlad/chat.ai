@@ -44,6 +44,47 @@ export class ChatService {
     }
   }
 
+  async getResponse(message: string): Promise<string> {
+    this.validateMessage(message);
+
+    const messages = this.buildConversation([], message);
+    const mcpEnabled = config.mcp.enabled && mcpToolsService.hasTools();
+    const provider = (mcpEnabled && this.deepSeekProvider) ? this.deepSeekProvider : this.aiProvider;
+    const tools = mcpEnabled ? mcpToolsService.convertToOpenAIFormat() : undefined;
+
+    if (mcpEnabled) {
+      console.log('🔧 Using DeepSeek with MCP tools for response generation');
+    }
+
+    return new Promise((resolve, reject) => {
+      let responseText = '';
+
+      const mockResponse = {
+        setHeader: () => {},
+        write: (data: string) => {
+          if (data.startsWith('data: ') && !data.includes('[DONE]') && !data.includes('token_usage')) {
+            try {
+              const jsonStr = data.slice(6).trim();
+              const parsed = JSON.parse(jsonStr);
+              if (parsed.text) {
+                responseText += parsed.text;
+              }
+            } catch (error) {
+              console.error('Failed to parse response chunk:', error);
+            }
+          }
+        },
+        end: () => resolve(responseText),
+        on: () => {},
+        headersSent: false,
+        closed: false,
+        writable: true
+      } as unknown as StreamResponse;
+
+      provider.streamChat(messages, mockResponse, undefined, undefined, tools).catch(reject);
+    });
+  }
+
   private async handleToolsListRequest(response: StreamResponse): Promise<void> {
     response.setHeader('Content-Type', 'text/event-stream');
     response.setHeader('Cache-Control', 'no-cache');

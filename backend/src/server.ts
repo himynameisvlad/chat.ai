@@ -7,11 +7,15 @@ import { ChatService } from './services/chat.service';
 import { ChatController } from './controllers/chat.controller';
 import { createChatRoutes } from './routes/chat.routes';
 import { createMCPRoutes } from './routes/mcp.routes';
+import sseRoutes from './routes/sse.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { IAIProvider } from './interfaces/ai-provider.interface';
 import { initializeDatabase, disconnect } from './database/database';
 import { mcpToolsService } from './services/mcp/mcp-tools.service';
 import { mcpClientService } from './services/mcp/mcp-client.service';
+import { cronService } from './services/cron.service';
+import { DailyToastTask } from './tasks/daily-toast.task';
+import { FetchPokemonTask } from './tasks/fetch-pokemon.task';
 
 class Application {
   private app: express.Application;
@@ -81,6 +85,7 @@ class Application {
     const chatRoutes = createChatRoutes(this.chatController);
     const mcpRoutes = createMCPRoutes();
     this.app.use('/api', chatRoutes);
+    this.app.use('/sse', sseRoutes);
     this.app.use('/mcp', mcpRoutes);
   }
 
@@ -109,6 +114,12 @@ class Application {
         console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
       });
 
+      const fetchPokemonTask = new FetchPokemonTask(this.chatService);
+      const dailyToastTask = new DailyToastTask(this.chatService);
+      cronService.registerTask(fetchPokemonTask);
+      cronService.registerTask(dailyToastTask);
+      cronService.start();
+
       this.setupGracefulShutdown();
     } catch (error) {
       console.error('Failed to start server:', error);
@@ -121,6 +132,7 @@ class Application {
       console.log(`\n${signal} received. Starting graceful shutdown...`);
 
       try {
+        cronService.stop();
         if (config.mcp.enabled) {
           await mcpClientService.disconnect();
         }
