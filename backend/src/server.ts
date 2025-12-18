@@ -11,8 +11,7 @@ import sseRoutes from './routes/sse.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { IAIProvider } from './interfaces/ai-provider.interface';
 import { initializeDatabase, disconnect } from './database/database';
-import { mcpToolsService } from './services/mcp/mcp-tools.service';
-import { mcpClientService } from './services/mcp/mcp-client.service';
+import { mcpInitializationService, mcpConfigService } from './services/mcp';
 import { cronService } from './services/cron.service';
 import { DailyToastTask } from './tasks/daily-toast.task';
 import { FetchPokemonTask } from './tasks/fetch-pokemon.task';
@@ -41,7 +40,7 @@ class Application {
     this.aiProvider = this.createAIProvider();
 
     // Create DeepSeek provider for MCP if enabled and primary provider is not DeepSeek
-    if (config.mcp.enabled && config.ai.provider !== 'deepseek') {
+    if (mcpConfigService.isEnabled() && config.ai.provider !== 'deepseek') {
       console.log('🔧 Initializing DeepSeek for MCP tool support');
       this.deepSeekProvider = this.createDeepSeekProvider();
     }
@@ -98,15 +97,7 @@ class Application {
   public async start(): Promise<void> {
     try {
       await initializeDatabase();
-
-      if (config.mcp.enabled) {
-        console.log(`🔧 Loading MCP tools from ${config.mcp.servers.length} server(s)...`);
-        await mcpToolsService.loadTools();
-        const connectedServers = mcpClientService.getConnectedServers();
-        if (connectedServers.length > 0) {
-          console.log(`✅ Connected to MCP servers: ${connectedServers.join(', ')}`);
-        }
-      }
+      await mcpInitializationService.initialize();
 
       this.app.listen(config.server.port, () => {
         console.log(`🚀 Server running on http://localhost:${config.server.port}`);
@@ -133,9 +124,7 @@ class Application {
 
       try {
         cronService.stop();
-        if (config.mcp.enabled) {
-          await mcpClientService.disconnect();
-        }
+        await mcpInitializationService.shutdown();
         await disconnect();
         console.log('✅ Graceful shutdown completed');
         process.exit(0);

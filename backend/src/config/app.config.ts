@@ -3,34 +3,12 @@ import path from 'path';
 
 dotenv.config();
 
-export interface MCPServerConfigStdio {
-  name: string;
-  enabled: boolean;
-  transport: 'stdio';
-  command: string;
-  args: string[];
-  env?: Record<string, string>;
-}
-
-export interface MCPServerConfigHTTP {
-  name: string;
-  enabled: boolean;
-  transport: 'http';
-  url: string;
-}
-
-export type MCPServerConfig = MCPServerConfigStdio | MCPServerConfigHTTP;
-
 interface AppConfig {
   server: {
     port: number;
   };
   database: {
     path: string;
-  };
-  mcp: {
-    enabled: boolean;
-    servers: MCPServerConfig[];
   };
   ai: {
     provider: 'deepseek' | 'openai' | 'huggingface';
@@ -48,50 +26,12 @@ interface AppConfig {
 }
 
 const getConfig = (): AppConfig => {
-  const mcpServers: MCPServerConfig[] = [];
-
-  // Add MCP servers here as needed
-  // Example for stdio transport:
-  // if (process.env.MCP_CUSTOM_SERVER_ENABLED === 'true') {
-  //   mcpServers.push({
-  //     name: 'custom-server',
-  //     enabled: true,
-  //     transport: 'stdio',
-  //     command: 'npx',
-  //     args: ['-y', '@modelcontextprotocol/server-custom'],
-  //     env: { API_KEY: process.env.MCP_CUSTOM_API_KEY },
-  //   });
-  // }
-  //
-  // Example for HTTP transport:
-  // if (process.env.MCP_HTTP_SERVER_ENABLED === 'true') {
-  //   mcpServers.push({
-  //     name: 'http-server',
-  //     enabled: true,
-  //     transport: 'http',
-  //     url: process.env.MCP_HTTP_SERVER_URL || 'http://localhost:8080',
-  //   });
-  // }
-
-  if (process.env.MCP_POKEMON_SERVER_ENABLED === 'true') {
-    mcpServers.push({
-      name: 'http-server',
-      enabled: true,
-      transport: 'http',
-      url: process.env.MCP_POKEMON_SERVER_URL || '',
-    });
-  }
-
   const config: AppConfig = {
     server: {
       port: parseInt(process.env.PORT || '3001', 10),
     },
     database: {
       path: process.env.DB_PATH || path.join(process.cwd(), 'data', 'chat.db'),
-    },
-    mcp: {
-      enabled: mcpServers.length > 0,
-      servers: mcpServers,
     },
     ai: {
       provider: (process.env.AI_PROVIDER as 'deepseek' | 'openai' | 'huggingface') || 'deepseek',

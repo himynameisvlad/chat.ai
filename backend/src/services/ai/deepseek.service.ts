@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { IAIProvider } from '../../interfaces/ai-provider.interface';
 import { Message, StreamResponse, AppError, DEFAULT_TEMPERATURE } from '../../types';
-import { mcpToolsService } from '../mcp/mcp-tools.service';
+import { mcpToolsService } from '../mcp';
 
 interface DeepSeekConfig {
   apiKey: string;

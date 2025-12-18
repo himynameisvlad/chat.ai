@@ -1,8 +1,7 @@
 import { IAIProvider } from '../interfaces/ai-provider.interface';
 import { Message, StreamResponse, AppError, HISTORY_THRESHOLD, RECENT_MESSAGES_COUNT, MAX_MESSAGE_LENGTH } from '../types';
 import { summaryRepository } from '../database/summary.repository';
-import { config } from '../config/app.config';
-import { mcpToolsService } from './mcp/mcp-tools.service';
+import { mcpToolsService, mcpConfigService } from './mcp';
 
 export class ChatService {
   constructor(
@@ -30,7 +29,7 @@ export class ChatService {
     const processedHistory = await this.processHistory(conversationHistory);
     const messages = this.buildConversation(processedHistory, newMessage);
 
-    const mcpEnabled = config.mcp.enabled && mcpToolsService.hasTools();
+    const mcpEnabled = mcpConfigService.isEnabled() && mcpToolsService.hasTools();
 
     // Route to DeepSeek if MCP is enabled and tools are available
     // DeepSeek will decide whether to use tools based on the conversation context
@@ -48,7 +47,7 @@ export class ChatService {
     this.validateMessage(message);
 
     const messages = this.buildConversation([], message);
-    const mcpEnabled = config.mcp.enabled && mcpToolsService.hasTools();
+    const mcpEnabled = mcpConfigService.isEnabled() && mcpToolsService.hasTools();
     const provider = (mcpEnabled && this.deepSeekProvider) ? this.deepSeekProvider : this.aiProvider;
     const tools = mcpEnabled ? mcpToolsService.convertToOpenAIFormat() : undefined;
 
@@ -90,7 +89,7 @@ export class ChatService {
     response.setHeader('Cache-Control', 'no-cache');
     response.setHeader('Connection', 'keep-alive');
 
-    if (!config.mcp.enabled || !mcpToolsService.hasTools()) {
+    if (!mcpConfigService.isEnabled() || !mcpToolsService.hasTools()) {
       const message = 'No MCP tools are currently available. Enable MCP servers in configuration to use tools.';
       response.write(`data: ${JSON.stringify({ text: message })}\n\n`);
       response.write('data: [DONE]\n\n');
