@@ -66,12 +66,18 @@ export class ToolChainingService {
         return;
       }
 
+      // Generate tool call IDs upfront
+      const toolCallsWithIds = result.toolCalls.map((tc, index) => ({
+        ...tc,
+        id: `call_${Date.now()}_${index}`,
+      }));
+
       // Add assistant message with tool calls to conversation
       conversationMessages.push({
         role: 'assistant',
         content: result.content || null,
-        tool_calls: result.toolCalls.map((tc, index) => ({
-          id: `call_${Date.now()}_${index}`,
+        tool_calls: toolCallsWithIds.map((tc) => ({
+          id: tc.id,
           type: 'function' as const,
           function: {
             name: tc.name,
@@ -83,7 +89,7 @@ export class ToolChainingService {
       // Execute tool calls
       response.write(`data: ${JSON.stringify({ text: '\n\n🔧 Executing tools...\n\n' })}\n\n`);
 
-      for (const toolCall of result.toolCalls) {
+      for (const toolCall of toolCallsWithIds) {
         try {
           const args = JSON.parse(toolCall.arguments);
           console.log(`[Chain ${iteration}] Tool: ${toolCall.name}`, args);
@@ -92,10 +98,10 @@ export class ToolChainingService {
 
           response.write(`data: ${JSON.stringify({ text: `✓ ${toolCall.name}\n` })}\n\n`);
 
-          // Add tool result to conversation
+          // Add tool result to conversation with matching ID
           conversationMessages.push({
             role: 'tool' as const,
-            tool_call_id: `call_${Date.now()}_${result.toolCalls.indexOf(toolCall)}`,
+            tool_call_id: toolCall.id,
             content: JSON.stringify(toolResult),
           });
 
@@ -110,10 +116,10 @@ export class ToolChainingService {
 
           response.write(`data: ${JSON.stringify({ text: `✗ ${toolCall.name}: ${errorMsg}\n\n` })}\n\n`);
 
-          // Add error to conversation
+          // Add error to conversation with matching ID
           conversationMessages.push({
             role: 'tool' as const,
-            tool_call_id: `call_${Date.now()}_${result.toolCalls.indexOf(toolCall)}`,
+            tool_call_id: toolCall.id,
             content: JSON.stringify({ error: errorMsg }),
           });
         }
