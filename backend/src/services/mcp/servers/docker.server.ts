@@ -12,13 +12,13 @@ export class DockerServer extends BaseMCPServer {
   getConfig(): MCPServerConfig | null {
     if (!this.isEnabled()) return null;
 
-    const serverPath = path.join(process.cwd(), 'dist/services/mcp/servers/docker-mcp-server.js');
+    const serverPath = path.join(process.cwd(), 'src/services/mcp/servers/docker-mcp-server.ts');
 
     return {
       name: this.name,
       enabled: true,
       transport: 'stdio',
-      command: 'node',
+      command: 'tsx',
       args: [serverPath],
       timeout: 600000,
     };

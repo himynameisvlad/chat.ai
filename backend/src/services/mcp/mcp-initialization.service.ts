@@ -34,7 +34,6 @@ export class MCPInitializationService {
       if (connectedServers.length > 0) {
         console.log(`✅ Connected to MCP servers: ${connectedServers.join(', ')}`);
         const tools = mcpToolsService.getTools();
-        console.log(`🛠️ Loaded ${tools.length} MCP tools`);
         this.initialized = true;
       } else {
         console.warn('⚠️ No MCP servers connected');
