@@ -16,6 +16,8 @@ export interface MCPServerConfigHTTP {
 
 export type MCPServerConfig = MCPServerConfigStdio | MCPServerConfigHTTP;
 
+import { mcpServers } from './servers';
+
 class MCPConfigService {
   private servers: MCPServerConfig[] = [];
   private initialized = false;
@@ -34,24 +36,11 @@ class MCPConfigService {
   private loadServers(): void {
     this.servers = [];
 
-    if (process.env.MCP_POKEMON_SERVER_ENABLED === 'true') {
-      this.servers.push({
-        name: 'pokemon',
-        enabled: true,
-        transport: 'http',
-        url: process.env.MCP_POKEMON_SERVER_URL || '',
-      });
-    }
-
-    if (process.env.MCP_FILESYSTEM_ENABLED === 'true') {
-      const allowedDirs = process.env.MCP_FILESYSTEM_ALLOWED_DIRS || process.cwd();
-      this.servers.push({
-        name: 'filesystem',
-        enabled: true,
-        transport: 'stdio',
-        command: 'npx',
-        args: ['-y', '@modelcontextprotocol/server-filesystem', allowedDirs],
-      });
+    for (const server of mcpServers) {
+      const config = server.getConfig();
+      if (config) {
+        this.servers.push(config);
+      }
     }
 
     this.initialized = true;
