@@ -1,7 +1,8 @@
 import OpenAI from 'openai';
 import { IAIProvider } from '../../interfaces/ai-provider.interface';
 import { Message, StreamResponse, AppError, DEFAULT_TEMPERATURE } from '../../types';
-import { mcpToolsService } from '../mcp/mcp-tools.service';
+import { mcpToolsService } from '../mcp';
+import { ToolChainingService } from './tool-chaining.service';
 
 interface DeepSeekConfig {
   apiKey: string;
@@ -14,6 +15,7 @@ export class DeepSeekService implements IAIProvider {
   private client: OpenAI;
   private model: string;
   private maxTokens: number;
+  private toolChainingService: ToolChainingService;
 
   constructor(config: DeepSeekConfig) {
     this.client = new OpenAI({
@@ -22,6 +24,7 @@ export class DeepSeekService implements IAIProvider {
     });
     this.model = config.model;
     this.maxTokens = config.maxTokens;
+    this.toolChainingService = new ToolChainingService(this.client, this.model, this.maxTokens);
   }
 
   async streamChat(
@@ -69,6 +72,31 @@ export class DeepSeekService implements IAIProvider {
       const stream = await this.client.chat.completions.create(requestParams);
 
       await this.processStream(stream, response, tools);
+    } catch (error) {
+      this.handleStreamError(error, response);
+    }
+  }
+
+  async streamChatWithChaining(
+    messages: Message[],
+    response: StreamResponse,
+    customPrompt?: string,
+    temperature?: number,
+    tools?: OpenAI.Chat.ChatCompletionTool[],
+    options?: {
+      maxIterations?: number;
+      verbose?: boolean;
+    }
+  ): Promise<void> {
+    try {
+      this.setStreamHeaders(response);
+      await this.toolChainingService.executeWithToolChaining(
+        messages,
+        response,
+        temperature,
+        tools,
+        options
+      );
     } catch (error) {
       this.handleStreamError(error, response);
     }

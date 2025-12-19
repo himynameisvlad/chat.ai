@@ -2,7 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import { config, MCPServerConfig } from '../../config/app.config';
+import { mcpConfigService, MCPServerConfig } from './mcp.config';
 
 export interface MCPTool {
   name: string;
@@ -21,12 +21,12 @@ export class MCPClientService {
   private connections: Map<string, MCPClientConnection> = new Map();
 
   async connect(): Promise<void> {
-    if (!config.mcp.enabled || config.mcp.servers.length === 0) {
+    const enabledServers = mcpConfigService.getEnabledServers();
+
+    if (enabledServers.length === 0) {
       console.log('ℹ️ No MCP servers configured');
       return;
     }
-
-    const enabledServers = config.mcp.servers.filter(s => s.enabled);
 
     for (const serverConfig of enabledServers) {
       if (this.connections.has(serverConfig.name)) {

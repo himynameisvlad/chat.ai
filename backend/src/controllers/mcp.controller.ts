@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { mcpClientService } from '../services/mcp/mcp-client.service';
+import { mcpClientService, mcpInitializationService } from '../services/mcp';
 import { AppError } from '../types';
 
 export class MCPController {

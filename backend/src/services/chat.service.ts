@@ -1,8 +1,8 @@
 import { IAIProvider } from '../interfaces/ai-provider.interface';
 import { Message, StreamResponse, AppError, HISTORY_THRESHOLD, RECENT_MESSAGES_COUNT, MAX_MESSAGE_LENGTH } from '../types';
 import { summaryRepository } from '../database/summary.repository';
-import { config } from '../config/app.config';
-import { mcpToolsService } from './mcp/mcp-tools.service';
+import { mcpToolsService, mcpConfigService } from './mcp';
+import { DeepSeekService } from './ai/deepseek.service';
 
 export class ChatService {
   constructor(
@@ -30,16 +30,28 @@ export class ChatService {
     const processedHistory = await this.processHistory(conversationHistory);
     const messages = this.buildConversation(processedHistory, newMessage);
 
-    const mcpEnabled = config.mcp.enabled && mcpToolsService.hasTools();
+    const mcpEnabled = mcpConfigService.isEnabled() && mcpToolsService.hasTools();
+    const tools = mcpEnabled ? mcpToolsService.convertToOpenAIFormat() : undefined;
 
-    // Route to DeepSeek if MCP is enabled and tools are available
-    // DeepSeek will decide whether to use tools based on the conversation context
-    if (mcpEnabled && this.deepSeekProvider) {
-      console.log('🔧 Using DeepSeek with MCP tools available');
-      const tools = mcpToolsService.convertToOpenAIFormat();
+    // If primary provider is DeepSeek and MCP is enabled, use chaining
+    if (mcpEnabled && this.aiProvider instanceof DeepSeekService) {
+      console.log('🔧 Using DeepSeek (primary) with MCP tools and chaining enabled');
+      await this.aiProvider.streamChatWithChaining(
+        messages,
+        response,
+        customPrompt,
+        temperature,
+        tools,
+        { maxIterations: 5, verbose: true }
+      );
+    }
+    // If MCP is enabled but primary provider is not DeepSeek, use DeepSeek fallback WITHOUT chaining
+    else if (mcpEnabled && this.deepSeekProvider) {
+      console.log('🔧 Using DeepSeek (fallback) with MCP tools without chaining');
       await this.deepSeekProvider.streamChat(messages, response, customPrompt, temperature, tools);
-    } else {
-      const tools = mcpToolsService.convertToOpenAIFormat();
+    }
+    // No MCP or no tools, use primary provider
+    else {
       await this.aiProvider.streamChat(messages, response, customPrompt, temperature, tools);
     }
   }
@@ -48,7 +60,7 @@ export class ChatService {
     this.validateMessage(message);
 
     const messages = this.buildConversation([], message);
-    const mcpEnabled = config.mcp.enabled && mcpToolsService.hasTools();
+    const mcpEnabled = mcpConfigService.isEnabled() && mcpToolsService.hasTools();
     const provider = (mcpEnabled && this.deepSeekProvider) ? this.deepSeekProvider : this.aiProvider;
     const tools = mcpEnabled ? mcpToolsService.convertToOpenAIFormat() : undefined;
 
@@ -90,7 +102,7 @@ export class ChatService {
     response.setHeader('Cache-Control', 'no-cache');
     response.setHeader('Connection', 'keep-alive');
 
-    if (!config.mcp.enabled || !mcpToolsService.hasTools()) {
+    if (!mcpConfigService.isEnabled() || !mcpToolsService.hasTools()) {
       const message = 'No MCP tools are currently available. Enable MCP servers in configuration to use tools.';
       response.write(`data: ${JSON.stringify({ text: message })}\n\n`);
       response.write('data: [DONE]\n\n');
