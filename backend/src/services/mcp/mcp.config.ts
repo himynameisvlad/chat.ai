@@ -5,6 +5,7 @@ export interface MCPServerConfigStdio {
   command: string;
   args: string[];
   env?: Record<string, string>;
+  timeout?: number;
 }
 
 export interface MCPServerConfigHTTP {
@@ -12,6 +13,7 @@ export interface MCPServerConfigHTTP {
   enabled: boolean;
   transport: 'http';
   url: string;
+  timeout?: number;
 }
 
 export type MCPServerConfig = MCPServerConfigStdio | MCPServerConfigHTTP;

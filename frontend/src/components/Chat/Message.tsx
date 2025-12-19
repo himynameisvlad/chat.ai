@@ -34,7 +34,7 @@ export function Message({ message }: MessageProps) {
           <LoadingIndicator />
         ) : (
           <>
-            <div className="prose prose-sm max-w-none">
+            <div className="prose prose-sm max-w-none break-words">
               <ReactMarkdown>{message.content}</ReactMarkdown>
             </div>
 

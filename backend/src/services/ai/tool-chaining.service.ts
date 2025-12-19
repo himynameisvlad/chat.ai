@@ -75,7 +75,7 @@ export class ToolChainingService {
       // Add assistant message with tool calls to conversation
       conversationMessages.push({
         role: 'assistant',
-        content: result.content || null,
+        content: result.content || '',
         tool_calls: toolCallsWithIds.map((tc) => ({
           id: tc.id,
           type: 'function' as const,

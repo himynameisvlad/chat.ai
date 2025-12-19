@@ -124,25 +124,31 @@ export class MCPClientService {
   }
 
   async callTool(name: string, args: Record<string, any>): Promise<any> {
-    // Find which server has this tool
     for (const [serverName, connection] of this.connections.entries()) {
       try {
         const tools = await connection.client.listTools();
         const hasTool = tools.tools.some(t => t.name === name);
 
         if (hasTool) {
-          const response = await connection.client.callTool({
-            name,
-            arguments: args,
-          });
+          const timeout = connection.serverConfig.timeout;
+
+          const response = await connection.client.callTool(
+            {
+              name,
+              arguments: args,
+            },
+            undefined,
+            timeout ? { timeout } : undefined
+          );
           return response;
         }
       } catch (error) {
         console.error(`Error checking/calling tool on ${serverName}:`, error);
+        throw error;
       }
     }
 
-    throw new Error(`Tool ${name} not found in any connected MCP server`);
+    throw new Error(`Tool "${name}" not found in any connected MCP server`);
   }
 
   isClientConnected(): boolean {
