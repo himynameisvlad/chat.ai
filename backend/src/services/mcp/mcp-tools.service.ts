@@ -40,8 +40,7 @@ export class MCPToolsService {
 
   async executeTool(toolName: string, args: Record<string, any>): Promise<any> {
     try {
-      const response = await mcpClientService.callTool(toolName, args);
-      return response;
+      return await mcpClientService.callTool(toolName, args);
     } catch (error) {
       console.error(`Failed to execute tool ${toolName}:`, error);
       throw error;

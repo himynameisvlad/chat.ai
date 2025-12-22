@@ -42,7 +42,7 @@ export class ChatService {
         customPrompt,
         temperature,
         tools,
-        { maxIterations: 5, verbose: true }
+        { maxIterations: 25, verbose: true }
       );
     }
     // If MCP is enabled but primary provider is not DeepSeek, use DeepSeek fallback WITHOUT chaining
