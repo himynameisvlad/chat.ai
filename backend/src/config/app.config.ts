@@ -23,6 +23,14 @@ interface AppConfig {
       model: string;
     };
   };
+  ollama: {
+    baseURL: string;
+    embeddingModel: string;
+    timeout: number;
+  };
+  pdf: {
+    folderPath: string;
+  };
 }
 
 const getConfig = (): AppConfig => {
@@ -45,6 +53,14 @@ const getConfig = (): AppConfig => {
         apiKey: process.env.HUGGINGFACE_API_KEY || '',
         model: process.env.HUGGINGFACE_MODEL || 'meta-llama/Llama-3.2-3B-Instruct',
       },
+    },
+    ollama: {
+      baseURL: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+      embeddingModel: process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',
+      timeout: 30000,
+    },
+    pdf: {
+      folderPath: process.env.PDF_FOLDER_PATH || 'pokemons/pdf',
     },
   };
 
