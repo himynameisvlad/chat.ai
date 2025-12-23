@@ -7,6 +7,7 @@ import { ChatService } from './services/chat.service';
 import { ChatController } from './controllers/chat.controller';
 import { createChatRoutes } from './routes/chat.routes';
 import { createMCPRoutes } from './routes/mcp.routes';
+import { createEmbeddingsRoutes } from './routes/embeddings.routes';
 import sseRoutes from './routes/sse.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { IAIProvider } from './interfaces/ai-provider.interface';
@@ -83,9 +84,11 @@ class Application {
   private setupRoutes(): void {
     const chatRoutes = createChatRoutes(this.chatController);
     const mcpRoutes = createMCPRoutes();
+    const embeddingsRoutes = createEmbeddingsRoutes();
     this.app.use('/api', chatRoutes);
     this.app.use('/sse', sseRoutes);
     this.app.use('/mcp', mcpRoutes);
+    this.app.use('/embeddings', embeddingsRoutes);
   }
 
   // Must be called last

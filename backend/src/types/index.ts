@@ -1,6 +1,7 @@
 import { Response } from 'express';
 
 export * from '@chat-ai/shared';
+export * from './embedding.types';
 
 export interface StreamResponse {
   setHeader(name: string, value: string | number | readonly string[]): void;
