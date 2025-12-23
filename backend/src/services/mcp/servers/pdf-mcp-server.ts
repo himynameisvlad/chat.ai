@@ -81,8 +81,8 @@ async function processPDFs(args: any) {
 
       // Chunk text
       const chunks = chunkingService.chunkText(pdfContent.text, {
-        maxTokens: 512,
-        overlap: 50,
+        maxTokens: 256,
+        overlap: 25,
       });
 
       if (chunks.length === 0) {
@@ -102,6 +102,7 @@ async function processPDFs(args: any) {
       const embeddingsToSave = embeddings.map((embedding, index) => ({
         filename: pdfFile,
         chunk_index: index,
+        chunk_text: chunks[index].text,
         embedding: Array.from(embedding),
         embedding_model: process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',
         dimension: embedding.length,
@@ -120,6 +121,8 @@ async function processPDFs(args: any) {
       results.push(`${pdfFile}: Error - ${errorMessage}`);
     }
   }
+
+  console.log('results: ', results);
 
   const summary = `Processed ${pdfFiles.length} PDF file(s), created ${totalEmbeddings} embeddings\n\nDetails:\n${results.join('\n')}`;
   return summary;

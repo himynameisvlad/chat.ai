@@ -3,6 +3,9 @@ import { Message, StreamResponse, AppError, HISTORY_THRESHOLD, RECENT_MESSAGES_C
 import { summaryRepository } from '../database/summary.repository';
 import { mcpToolsService, mcpConfigService } from './mcp';
 import { DeepSeekService } from './ai/deepseek.service';
+import { embeddingRepository } from '../database/embedding.repository';
+import { OllamaService } from './ollama.service';
+import { cosineSimilarity } from '../utils/vector.utils';
 
 export class ChatService {
   constructor(
@@ -233,6 +236,81 @@ export class ChatService {
         mockResponse
       ).catch(reject);
     });
+  }
+
+  /**
+   * Research RAG - compares AI responses with and without RAG context
+   * @param query - User's question
+   * @param topN - Number of top relevant chunks to retrieve
+   * @returns Object with both responses (with RAG and without RAG)
+   */
+  async researchRAG(query: string, topN: number = 3): Promise<{
+    responseWithRAG: string;
+    responseWithoutRAG: string;
+    relevantChunks: Array<{ text: string; similarity: number; filename: string }>;
+  }> {
+    this.validateMessage(query);
+
+    // Initialize Ollama service for embeddings
+    const ollamaService = new OllamaService();
+
+    // Check if Ollama is available
+    const isOllamaAvailable = await ollamaService.ping();
+    if (!isOllamaAvailable) {
+      throw new AppError(503, 'Ollama service is not available. Please ensure Ollama is running.');
+    }
+
+    // Generate embedding for the query
+    const queryEmbedding = await ollamaService.generateEmbedding(query);
+
+    // Get all embeddings from database
+    const allEmbeddings = await embeddingRepository.getAllEmbeddings();
+
+    if (allEmbeddings.length === 0) {
+      throw new AppError(404, 'No embeddings found in database. Please process some PDF files first.');
+    }
+
+    // Calculate similarity for each embedding and sort by similarity
+    const similarities = allEmbeddings
+      .map(emb => ({
+        ...emb,
+        similarity: cosineSimilarity(queryEmbedding, emb.embedding)
+      }))
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, topN);
+
+    // Extract relevant chunks with text
+    const relevantChunks = similarities.map(s => ({
+      text: s.chunk_text || '',
+      similarity: s.similarity,
+      filename: s.filename
+    }));
+
+    // Build context from relevant chunks
+    const context = relevantChunks
+      .map((chunk, idx) => `[Chunk ${idx + 1} from ${chunk.filename}]:\n${chunk.text}`)
+      .join('\n\n');
+
+    // Get response WITHOUT RAG
+    const responseWithoutRAG = await this.getResponse(query);
+
+    // Get response WITH RAG
+    const promptWithRAG = `Based on the following context, please answer the question.
+
+Context:
+${context}
+
+Question: ${query}
+
+Answer:`;
+
+    const responseWithRAG = await this.getResponse(promptWithRAG);
+
+    return {
+      responseWithRAG,
+      responseWithoutRAG,
+      relevantChunks
+    };
   }
 
   /**

@@ -2,6 +2,7 @@ export interface PDFEmbedding {
   id: number;
   filename: string;
   chunk_index: number;
+  chunk_text?: string;
   embedding: number[];
   embedding_model: string;
   dimension: number;

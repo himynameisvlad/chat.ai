@@ -15,5 +15,8 @@ export const createChatRoutes = (chatController: ChatController): Router => {
   // GET /api/health - Health check endpoint
   router.get('/health', chatController.handleHealth);
 
+  // POST /api/research-rag - Research RAG: compare responses with and without RAG
+  router.post('/research-rag', chatController.handleResearchRAG);
+
   return router;
 };
