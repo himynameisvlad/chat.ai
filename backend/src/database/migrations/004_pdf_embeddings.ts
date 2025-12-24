@@ -5,6 +5,7 @@ export const migration = {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       filename TEXT NOT NULL,
       chunk_index INTEGER NOT NULL,
+      chunk_text TEXT,
       embedding TEXT NOT NULL,
       embedding_model TEXT NOT NULL,
       dimension INTEGER NOT NULL,

@@ -20,10 +20,11 @@ export class EmbeddingRepository {
 
       for (const embedding of embeddings) {
         await db.run(
-          `INSERT INTO pdf_embeddings (filename, chunk_index, embedding, embedding_model, dimension, token_count)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO pdf_embeddings (filename, chunk_index, chunk_text, embedding, embedding_model, dimension, token_count)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
           embedding.filename,
           embedding.chunk_index,
+          embedding.chunk_text || null,
           JSON.stringify(embedding.embedding),
           embedding.embedding_model,
           embedding.dimension,

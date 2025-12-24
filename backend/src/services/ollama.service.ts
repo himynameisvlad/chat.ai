@@ -49,7 +49,7 @@ export class OllamaService {
   /**
    * Generate embedding for a single text
    */
-  private async generateEmbedding(text: string): Promise<Float32Array> {
+  async generateEmbedding(text: string): Promise<Float32Array> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
