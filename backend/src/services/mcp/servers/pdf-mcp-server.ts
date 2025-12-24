@@ -34,7 +34,6 @@ const chunkingService = new ChunkingService();
 const ollamaService = new OllamaService(
   process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
   process.env.OLLAMA_EMBEDDING_MODEL || 'nomic-embed-text',
-  parseInt(process.env.OLLAMA_TIMEOUT || '30000', 10)
 );
 
 async function processPDFs(args: any) {

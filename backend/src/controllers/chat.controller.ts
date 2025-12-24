@@ -34,27 +34,43 @@ export class ChatController {
   };
 
   handleResearchRAG = async (
-    req: Request<{}, {}, { query: string; topN?: number }>,
+    req: Request<{}, {}, {
+      query: string;
+      topN?: number;
+      threshold?: number;
+      initialTopK?: number;
+    }>,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      const { query, topN = 3 } = req.body;
+      const {
+        query,
+        topN = 3,
+        threshold = 0.5,
+        initialTopK = 20
+      } = req.body;
 
       if (!query || query.trim().length === 0) {
         res.status(400).json({ error: 'Query is required' });
         return;
       }
 
-      const result = await this.chatService.researchRAG(query, topN);
+      const result = await this.chatService.researchRAG(query, topN, threshold, initialTopK);
 
       res.json({
         success: true,
         query,
-        topN,
-        responseWithRAG: result.responseWithRAG,
-        responseWithoutRAG: result.responseWithoutRAG,
-        relevantChunks: result.relevantChunks
+        parameters: {
+          topN,
+          threshold,
+          initialTopK
+        },
+        responseWithReranking: result.responseWithReranking,
+        responseWithoutReranking: result.responseWithoutReranking,
+        chunksWithReranking: result.chunksWithReranking,
+        chunksWithoutReranking: result.chunksWithoutReranking,
+        metadata: result.metadata
       });
     } catch (error) {
       next(error);
