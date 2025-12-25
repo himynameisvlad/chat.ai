@@ -6,6 +6,7 @@ import { DeepSeekService } from './ai/deepseek.service';
 import { embeddingRepository } from '../database/embedding.repository';
 import { OllamaService } from './ollama.service';
 import { cosineSimilarity } from '../utils/vector.utils';
+import { RagService } from './rag.service';
 
 export class ChatService {
   constructor(

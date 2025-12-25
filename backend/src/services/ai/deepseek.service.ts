@@ -38,19 +38,19 @@ export class DeepSeekService implements IAIProvider {
       // Set headers for Server-Sent Events (SSE)
       this.setStreamHeaders(response);
 
-     // const systemPromptContent = customPrompt || this.getDefaultSystemPrompt();
+      const systemPromptContent = customPrompt || this.getDefaultSystemPrompt();
 
-      // const systemMessage: Message = {
-      //   role: 'system',
-      //   content: systemPromptContent,
-      // };
+      const systemMessage: Message = {
+        role: 'system',
+        content: systemPromptContent,
+      };
 
-      // const filteredMessages = messages.filter(msg => msg.role !== 'system');
-      // const messagesToSend = [systemMessage, ...filteredMessages];
+      const filteredMessages = messages.filter(msg => msg.role !== 'system');
+      const messagesToSend = [systemMessage, ...filteredMessages];
 
       // Convert messages to OpenAI format
       const formattedMessages: OpenAI.Chat.ChatCompletionMessageParam[] =
-        messages.map((msg) => ({
+        messagesToSend.map((msg) => ({
           role: msg.role as 'user' | 'assistant' | 'system',
           content: msg.content,
         }));
@@ -90,8 +90,19 @@ export class DeepSeekService implements IAIProvider {
   ): Promise<void> {
     try {
       this.setStreamHeaders(response);
+
+      const systemPromptContent = customPrompt || this.getDefaultSystemPrompt();
+
+      const systemMessage: Message = {
+        role: 'system',
+        content: systemPromptContent,
+      };
+
+      const filteredMessages = messages.filter(msg => msg.role !== 'system');
+      const messagesToSend = [systemMessage, ...filteredMessages];
+
       await this.toolChainingService.executeWithToolChaining(
-        messages,
+        messagesToSend,
         response,
         temperature,
         tools,
@@ -272,6 +283,13 @@ export class DeepSeekService implements IAIProvider {
 - Если запрос простой и однозначный - сразу давай полный ответ
 - НЕ задавай очевидные вопросы, только те, что действительно нужны
 - Держи в памяти информацию о предыдущих запросах и ответах
-- Отвечай на русском языке естественным образом, без специального форматирования`;
+- Отвечай на русском языке естественным образом, без специального форматирования
+
+РАБОТА С ДОКУМЕНТАМИ (RAG):
+- Если используешь инструмент rag_query для поиска информации в документах:
+  * ОБЯЗАТЕЛЬНО указывай источник в формате "Источник: [название_файла]" после использования информации
+  * Если информация из нескольких файлов - укажи все источники
+  * Пример: "Согласно документации, параметр X равен Y. Источник: [config.pdf]"
+- НЕ выдумывай источники - указывай только те файлы, которые реально были получены через rag_query`;
   }
 }
