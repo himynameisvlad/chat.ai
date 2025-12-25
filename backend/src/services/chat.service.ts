@@ -239,15 +239,44 @@ export class ChatService {
   }
 
   /**
-   * Research RAG - compares AI responses with and without RAG context
+   * Research RAG - compares AI responses with and without reranking
    * @param query - User's question
    * @param topN - Number of top relevant chunks to retrieve
-   * @returns Object with both responses (with RAG and without RAG)
+   * @param threshold - Minimum relevance score (0-1) for including chunks
+   * @param initialTopK - Number of candidates to retrieve before reranking
+   * @returns Object with both responses (with reranking and without reranking)
    */
-  async researchRAG(query: string, topN: number = 3): Promise<{
-    responseWithRAG: string;
-    responseWithoutRAG: string;
-    relevantChunks: Array<{ text: string; similarity: number; filename: string }>;
+  async researchRAG(
+    query: string,
+    topN: number = 3,
+    threshold: number = 0.5,
+    initialTopK: number = 20
+  ): Promise<{
+    responseWithReranking: string;
+    responseWithoutReranking: string;
+    chunksWithReranking: Array<{
+      text: string;
+      similarity: number;
+      filename: string;
+      relevanceScore: number;
+    }>;
+    chunksWithoutReranking: Array<{
+      text: string;
+      similarity: number;
+      filename: string;
+    }>;
+    metadata: {
+      totalChunks: number;
+      chunksAboveThreshold: {
+        withReranking: number;
+        withoutReranking: number;
+      };
+      chunksUsed: {
+        withReranking: number;
+        withoutReranking: number;
+      };
+      threshold: number;
+    };
   }> {
     this.validateMessage(query);
 
@@ -276,40 +305,115 @@ export class ChatService {
         ...emb,
         similarity: cosineSimilarity(queryEmbedding, emb.embedding)
       }))
-      .sort((a, b) => b.similarity - a.similarity)
-      .slice(0, topN);
+      .sort((a, b) => b.similarity - a.similarity);
 
-    // Extract relevant chunks with text
-    const relevantChunks = similarities.map(s => ({
-      text: s.chunk_text || '',
-      similarity: s.similarity,
-      filename: s.filename
-    }));
+    // Get initial candidates
+    const candidates = similarities.slice(0, Math.min(initialTopK, similarities.length));
 
-    // Build context from relevant chunks
-    const context = relevantChunks
-      .map((chunk, idx) => `[Chunk ${idx + 1} from ${chunk.filename}]:\n${chunk.text}`)
-      .join('\n\n');
+    // Path 1: WITHOUT reranking - use cosine similarity threshold
+    const chunksWithoutReranking = candidates
+      .filter(c => c.similarity >= threshold)
+      .slice(0, topN)
+      .map(s => ({
+        text: s.chunk_text || '',
+        similarity: s.similarity,
+        filename: s.filename
+      }));
 
-    // Get response WITHOUT RAG
-    const responseWithoutRAG = await this.getResponse(query);
+    // Path 2: WITH reranking - use LLM-based relevance scoring
+    console.log(`🔄 Reranking ${candidates.length} candidates...`);
+    console.log('📋 Candidates with cosine similarity:');
+    candidates.forEach((c, i) => {
+      console.log(`  [${i}] CosSim: ${c.similarity.toFixed(3)} - "${c.chunk_text?.substring(0, 80)}..."`);
+    });
 
-    // Get response WITH RAG
-    const promptWithRAG = `Based on the following context, please answer the question.
+    const documents = candidates.map(c => c.chunk_text || '');
+    const rerankResults = await ollamaService.rerank(query, documents);
+
+    console.log('🎯 Reranking results (sorted by LLM score):');
+    rerankResults.forEach((r, i) => {
+      console.log(`  [${i}] LLM: ${r.relevanceScore.toFixed(3)} | CosSim: ${candidates[r.index].similarity.toFixed(3)} - "${candidates[r.index].chunk_text?.substring(0, 80)}..."`);
+    });
+    console.log(`📊 Threshold: ${threshold}, chunks above: ${rerankResults.filter(r => r.relevanceScore >= threshold).length}`);
+
+    const chunksWithReranking = rerankResults
+      .map(result => ({
+        ...candidates[result.index],
+        relevanceScore: result.relevanceScore,
+        text: candidates[result.index].chunk_text || '',
+        filename: candidates[result.index].filename
+      }))
+      .filter(chunk => chunk.relevanceScore >= threshold)
+      .slice(0, topN)
+      .map(chunk => ({
+        text: chunk.text,
+        similarity: chunk.similarity,
+        filename: chunk.filename,
+        relevanceScore: chunk.relevanceScore
+      }));
+
+    // Prepare metadata
+    const metadata = {
+      totalChunks: allEmbeddings.length,
+      chunksAboveThreshold: {
+        withReranking: rerankResults.filter(r => r.relevanceScore >= threshold).length,
+        withoutReranking: similarities.filter(s => s.similarity >= threshold).length
+      },
+      chunksUsed: {
+        withReranking: chunksWithReranking.length,
+        withoutReranking: chunksWithoutReranking.length
+      },
+      threshold
+    };
+
+    // Generate response WITHOUT reranking
+    let responseWithoutReranking: string;
+    if (chunksWithoutReranking.length === 0) {
+      responseWithoutReranking = 'No relevant information found above the similarity threshold.';
+    } else {
+      const contextWithoutReranking = chunksWithoutReranking
+        .map((chunk, idx) => `[Chunk ${idx + 1} from ${chunk.filename} (Similarity: ${chunk.similarity.toFixed(2)})]:\n${chunk.text}`)
+        .join('\n\n');
+
+      const promptWithoutReranking = `Based on the following context, please answer the question.
 
 Context:
-${context}
+${contextWithoutReranking}
 
 Question: ${query}
 
 Answer:`;
 
-    const responseWithRAG = await this.getResponse(promptWithRAG);
+      responseWithoutReranking = await this.getResponse(promptWithoutReranking);
+    }
+
+    // Generate response WITH reranking
+    let responseWithReranking: string;
+    if (chunksWithReranking.length === 0) {
+      responseWithReranking = 'No relevant information found above the relevance threshold.';
+    } else {
+      const contextWithReranking = chunksWithReranking
+        .map((chunk, idx) => `[Chunk ${idx + 1} from ${chunk.filename} (Relevance: ${chunk.relevanceScore.toFixed(2)})]:\n${chunk.text}`)
+        .join('\n\n');
+
+      const promptWithReranking = `Based on the following context, please answer the question.
+
+Context:
+${contextWithReranking}
+
+Question: ${query}
+
+Answer:`;
+
+      responseWithReranking = await this.getResponse(promptWithReranking);
+    }
 
     return {
-      responseWithRAG,
-      responseWithoutRAG,
-      relevantChunks
+      responseWithReranking,
+      responseWithoutReranking,
+      chunksWithReranking,
+      chunksWithoutReranking,
+      metadata
     };
   }
 
