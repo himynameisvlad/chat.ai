@@ -38,19 +38,19 @@ export class DeepSeekService implements IAIProvider {
       // Set headers for Server-Sent Events (SSE)
       this.setStreamHeaders(response);
 
-     // const systemPromptContent = customPrompt || this.getDefaultSystemPrompt();
+      const systemPromptContent = customPrompt || this.getDefaultSystemPrompt();
 
-      // const systemMessage: Message = {
-      //   role: 'system',
-      //   content: systemPromptContent,
-      // };
+      const systemMessage: Message = {
+        role: 'system',
+        content: systemPromptContent,
+      };
 
-      // const filteredMessages = messages.filter(msg => msg.role !== 'system');
-      // const messagesToSend = [systemMessage, ...filteredMessages];
+      const filteredMessages = messages.filter(msg => msg.role !== 'system');
+      const messagesToSend = [systemMessage, ...filteredMessages];
 
       // Convert messages to OpenAI format
       const formattedMessages: OpenAI.Chat.ChatCompletionMessageParam[] =
-        messages.map((msg) => ({
+        messagesToSend.map((msg) => ({
           role: msg.role as 'user' | 'assistant' | 'system',
           content: msg.content,
         }));
@@ -90,8 +90,19 @@ export class DeepSeekService implements IAIProvider {
   ): Promise<void> {
     try {
       this.setStreamHeaders(response);
+
+      const systemPromptContent = customPrompt || this.getDefaultSystemPrompt();
+
+      const systemMessage: Message = {
+        role: 'system',
+        content: systemPromptContent,
+      };
+
+      const filteredMessages = messages.filter(msg => msg.role !== 'system');
+      const messagesToSend = [systemMessage, ...filteredMessages];
+
       await this.toolChainingService.executeWithToolChaining(
-        messages,
+        messagesToSend,
         response,
         temperature,
         tools,
@@ -188,8 +199,10 @@ export class DeepSeekService implements IAIProvider {
     tools?: OpenAI.Chat.ChatCompletionTool[]
   ): Promise<void> {
     try {
-      // Notify user that tools are being executed
-      response.write(`data: ${JSON.stringify({ text: '\n\n🔧 Using tools...\n\n' })}\n\n`);
+      console.log('🔧 Using tools...');
+
+      // Notify frontend that tool execution started
+      response.write(`data: ${JSON.stringify({ type: 'tool_execution_start' })}\n\n`);
 
       // Execute all tool calls
       const toolResults: Array<{ name: string; result: any }> = [];
@@ -203,21 +216,21 @@ export class DeepSeekService implements IAIProvider {
           const result = await mcpToolsService.executeTool(name, args);
           toolResults.push({ name, result });
 
-          response.write(`data: ${JSON.stringify({ text: `✓ ${name}\n` })}\n\n`);
+          console.log(`✓ ${name}`);
+          console.log('Result:', JSON.stringify(result, null, 2));
         } catch (error) {
           console.error(`Error executing tool ${name}:`, error);
           const errorMsg = error instanceof Error ? error.message : 'Unknown error';
           toolResults.push({ name, result: { error: errorMsg } });
-          response.write(`data: ${JSON.stringify({ text: `✗ ${name}: ${errorMsg}\n` })}\n\n`);
+          console.log(`✗ ${name}: ${errorMsg}`);
         }
       }
 
-      // Format tool results for display
-      response.write(`data: ${JSON.stringify({ text: '\n' })}\n\n`);
-      for (const { name, result } of toolResults) {
-        const resultStr = JSON.stringify(result, null, 2);
-        response.write(`data: ${JSON.stringify({ text: resultStr + '\n\n' })}\n\n`);
-      }
+      // Notify frontend that tool execution ended
+      response.write(`data: ${JSON.stringify({ type: 'tool_execution_end' })}\n\n`);
+
+      // Add newlines so the next response starts on a new line
+      response.write(`data: ${JSON.stringify({ text: '\n\n' })}\n\n`);
 
       response.write('data: [DONE]\n\n');
       response.end();
@@ -272,6 +285,13 @@ export class DeepSeekService implements IAIProvider {
 - Если запрос простой и однозначный - сразу давай полный ответ
 - НЕ задавай очевидные вопросы, только те, что действительно нужны
 - Держи в памяти информацию о предыдущих запросах и ответах
-- Отвечай на русском языке естественным образом, без специального форматирования`;
+- Отвечай на русском языке естественным образом, без специального форматирования
+
+РАБОТА С ДОКУМЕНТАМИ (RAG):
+- Если используешь инструмент rag_query для поиска информации в документах:
+  * ОБЯЗАТЕЛЬНО указывай источник в формате "Источник: [название_файла]" после использования информации
+  * Если информация из нескольких файлов - укажи все источники
+  * Пример: "Согласно документации, параметр X равен Y. Источник: [config.pdf]"
+- НЕ выдумывай источники - указывай только те файлы, которые реально были получены через rag_query`;
   }
 }

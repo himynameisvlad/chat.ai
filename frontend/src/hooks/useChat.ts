@@ -6,6 +6,7 @@ import { useSessionTokens } from './useSessionTokens';
 interface UseChatReturn {
   messages: Message[];
   isLoading: boolean;
+  isExecutingTools: boolean;
   error: string | null;
   customPrompt: string;
   setCustomPrompt: (value: string) => void;
@@ -20,6 +21,7 @@ interface UseChatReturn {
 export function useChat(): UseChatReturn {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isExecutingTools, setIsExecutingTools] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customPrompt, setCustomPrompt] = useState('');
   const [temperature, setTemperature] = useState(DEFAULT_TEMPERATURE);
@@ -95,6 +97,12 @@ export function useChat(): UseChatReturn {
 
             updateTokens(usage);
           },
+          () => {
+            setIsExecutingTools(true);
+          },
+          () => {
+            setIsExecutingTools(false);
+          },
           customPrompt || undefined,
           temperature
         );
@@ -136,6 +144,7 @@ export function useChat(): UseChatReturn {
   return {
     messages,
     isLoading,
+    isExecutingTools,
     error,
     customPrompt,
     setCustomPrompt,

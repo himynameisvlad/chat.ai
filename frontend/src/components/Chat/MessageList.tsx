@@ -8,6 +8,7 @@ import { EmptyState } from './EmptyState';
 interface MessageListProps {
   messages: MessageType[];
   scrollRef: React.RefObject<HTMLDivElement | null>;
+  isExecutingTools?: boolean;
 }
 
 /**
@@ -15,16 +16,25 @@ interface MessageListProps {
  * Displays a list of chat messages
  * Follows Single Responsibility Principle - only handles message display
  */
-export function MessageList({ messages, scrollRef }: MessageListProps) {
+export function MessageList({ messages, scrollRef, isExecutingTools }: MessageListProps) {
   if (messages.length === 0) {
     return <EmptyState />;
   }
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {messages.map((message, index) => (
-        <Message key={index} message={message} />
-      ))}
+      {messages.map((message, index) => {
+        const isLastMessage = index === messages.length - 1;
+        const showToolLoader = isLastMessage && isExecutingTools && message.role === 'assistant';
+
+        return (
+          <Message
+            key={index}
+            message={message}
+            isExecutingTools={showToolLoader}
+          />
+        );
+      })}
       <div ref={scrollRef} />
     </div>
   );

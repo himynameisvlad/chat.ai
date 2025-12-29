@@ -40,7 +40,7 @@ export class ToolChainingService {
       iteration++;
 
       if (verbose && iteration > 1) {
-        response.write(`data: ${JSON.stringify({ text: `\n🔄 Chain iteration ${iteration}\n\n` })}\n\n`);
+        console.log(`🔄 Chain iteration ${iteration}`);
       }
 
       const requestParams: OpenAI.Chat.ChatCompletionCreateParams = {
@@ -87,7 +87,10 @@ export class ToolChainingService {
       });
 
       // Execute tool calls
-      response.write(`data: ${JSON.stringify({ text: '\n\n🔧 Executing tools...\n\n' })}\n\n`);
+      console.log('🔧 Executing tools...');
+
+      // Notify frontend that tool execution started
+      response.write(`data: ${JSON.stringify({ type: 'tool_execution_start' })}\n\n`);
 
       for (const toolCall of toolCallsWithIds) {
         try {
@@ -96,7 +99,7 @@ export class ToolChainingService {
 
           const toolResult = await mcpToolsService.executeTool(toolCall.name, args);
 
-          response.write(`data: ${JSON.stringify({ text: `✓ ${toolCall.name}\n` })}\n\n`);
+          console.log(`✓ ${toolCall.name}`);
 
           // Add tool result to conversation with matching ID
           conversationMessages.push({
@@ -105,16 +108,15 @@ export class ToolChainingService {
             content: JSON.stringify(toolResult),
           });
 
-          // Stream result to user
+          // Log result
           if (verbose) {
-            const resultStr = JSON.stringify(toolResult, null, 2);
-            response.write(`data: ${JSON.stringify({ text: `\n${resultStr}\n\n` })}\n\n`);
+            console.log('Result:', JSON.stringify(toolResult, null, 2));
           }
         } catch (error) {
           console.error(`Error executing tool ${toolCall.name}:`, error);
           const errorMsg = error instanceof Error ? error.message : 'Unknown error';
 
-          response.write(`data: ${JSON.stringify({ text: `✗ ${toolCall.name}: ${errorMsg}\n\n` })}\n\n`);
+          console.log(`✗ ${toolCall.name}: ${errorMsg}`);
 
           // Add error to conversation with matching ID
           conversationMessages.push({
@@ -125,11 +127,15 @@ export class ToolChainingService {
         }
       }
 
-      response.write(`data: ${JSON.stringify({ text: '\n' })}\n\n`);
+      // Notify frontend that tool execution ended
+      response.write(`data: ${JSON.stringify({ type: 'tool_execution_end' })}\n\n`);
+
+      // Add newlines so the next response starts on a new line
+      response.write(`data: ${JSON.stringify({ text: '\n\n' })}\n\n`);
     }
 
     // Max iterations reached
-    response.write(`data: ${JSON.stringify({ text: '\n⚠️ Max iterations reached. Tool chaining stopped.\n' })}\n\n`);
+    console.log('⚠️ Max iterations reached. Tool chaining stopped.');
     response.write('data: [DONE]\n\n');
     response.end();
   }

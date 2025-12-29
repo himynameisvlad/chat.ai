@@ -5,8 +5,8 @@ import { MessageInput } from './MessageInput';
 import { SessionTokenCounter } from './SessionTokenCounter';
 
 export function Chat() {
-  const { messages, isLoading, customPrompt, setCustomPrompt, temperature, setTemperature, sendMessage, sessionTokens } = useChat();
-  const scrollRef = useAutoScroll(messages);
+  const { messages, isLoading, isExecutingTools, customPrompt, setCustomPrompt, temperature, setTemperature, sendMessage, sessionTokens } = useChat();
+  const scrollRef = useAutoScroll([messages, isExecutingTools]);
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -18,7 +18,7 @@ export function Chat() {
       </header>
 
       <div className="flex-1 overflow-y-auto px-4 py-6">
-        <MessageList messages={messages} scrollRef={scrollRef} />
+        <MessageList messages={messages} scrollRef={scrollRef} isExecutingTools={isExecutingTools} />
       </div>
 
       <MessageInput

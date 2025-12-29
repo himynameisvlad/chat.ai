@@ -5,9 +5,11 @@ import { DeepSeekService } from './services/ai/deepseek.service';
 import { HuggingFaceService } from './services/ai/huggingface.service';
 import { ChatService } from './services/chat.service';
 import { ChatController } from './controllers/chat.controller';
+import { PDFController } from './controllers/pdf.controller';
 import { createChatRoutes } from './routes/chat.routes';
 import { createMCPRoutes } from './routes/mcp.routes';
 import { createEmbeddingsRoutes } from './routes/embeddings.routes';
+import { createPDFRoutes } from './routes/pdf.routes';
 import sseRoutes from './routes/sse.routes';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { IAIProvider } from './interfaces/ai-provider.interface';
@@ -23,6 +25,7 @@ class Application {
   private deepSeekProvider?: IAIProvider;
   private chatService!: ChatService;
   private chatController!: ChatController;
+  private pdfController!: PDFController;
 
   constructor() {
     this.app = express();
@@ -48,6 +51,7 @@ class Application {
 
     this.chatService = new ChatService(this.aiProvider, this.deepSeekProvider);
     this.chatController = new ChatController(this.chatService);
+    this.pdfController = new PDFController();
   }
 
   private createDeepSeekProvider(): IAIProvider {
@@ -85,10 +89,12 @@ class Application {
     const chatRoutes = createChatRoutes(this.chatController);
     const mcpRoutes = createMCPRoutes();
     const embeddingsRoutes = createEmbeddingsRoutes();
+    const pdfRoutes = createPDFRoutes(this.pdfController);
     this.app.use('/api', chatRoutes);
     this.app.use('/sse', sseRoutes);
     this.app.use('/mcp', mcpRoutes);
     this.app.use('/embeddings', embeddingsRoutes);
+    this.app.use('/api/pdf', pdfRoutes);
   }
 
   // Must be called last
@@ -108,11 +114,11 @@ class Application {
         console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
       });
 
-      const fetchPokemonTask = new FetchPokemonTask(this.chatService);
-      const dailyToastTask = new DailyToastTask(this.chatService);
-      cronService.registerTask(fetchPokemonTask);
-      cronService.registerTask(dailyToastTask);
-      cronService.start();
+      // const fetchPokemonTask = new FetchPokemonTask(this.chatService);
+      // const dailyToastTask = new DailyToastTask(this.chatService);
+      // cronService.registerTask(fetchPokemonTask);
+      // cronService.registerTask(dailyToastTask);
+      // cronService.start();
 
       this.setupGracefulShutdown();
     } catch (error) {
