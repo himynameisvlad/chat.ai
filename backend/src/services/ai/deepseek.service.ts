@@ -199,8 +199,10 @@ export class DeepSeekService implements IAIProvider {
     tools?: OpenAI.Chat.ChatCompletionTool[]
   ): Promise<void> {
     try {
-      // Notify user that tools are being executed
-      response.write(`data: ${JSON.stringify({ text: '\n\n🔧 Using tools...\n\n' })}\n\n`);
+      console.log('🔧 Using tools...');
+
+      // Notify frontend that tool execution started
+      response.write(`data: ${JSON.stringify({ type: 'tool_execution_start' })}\n\n`);
 
       // Execute all tool calls
       const toolResults: Array<{ name: string; result: any }> = [];
@@ -214,21 +216,21 @@ export class DeepSeekService implements IAIProvider {
           const result = await mcpToolsService.executeTool(name, args);
           toolResults.push({ name, result });
 
-          response.write(`data: ${JSON.stringify({ text: `✓ ${name}\n` })}\n\n`);
+          console.log(`✓ ${name}`);
+          console.log('Result:', JSON.stringify(result, null, 2));
         } catch (error) {
           console.error(`Error executing tool ${name}:`, error);
           const errorMsg = error instanceof Error ? error.message : 'Unknown error';
           toolResults.push({ name, result: { error: errorMsg } });
-          response.write(`data: ${JSON.stringify({ text: `✗ ${name}: ${errorMsg}\n` })}\n\n`);
+          console.log(`✗ ${name}: ${errorMsg}`);
         }
       }
 
-      // Format tool results for display
-      response.write(`data: ${JSON.stringify({ text: '\n' })}\n\n`);
-      for (const { name, result } of toolResults) {
-        const resultStr = JSON.stringify(result, null, 2);
-        response.write(`data: ${JSON.stringify({ text: resultStr + '\n\n' })}\n\n`);
-      }
+      // Notify frontend that tool execution ended
+      response.write(`data: ${JSON.stringify({ type: 'tool_execution_end' })}\n\n`);
+
+      // Add newlines so the next response starts on a new line
+      response.write(`data: ${JSON.stringify({ text: '\n\n' })}\n\n`);
 
       response.write('data: [DONE]\n\n');
       response.end();
