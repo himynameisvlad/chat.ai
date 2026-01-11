@@ -30,6 +30,8 @@ export class ChatService {
    * @param message - New message to send
    * @param onChunk - Callback for each text chunk received
    * @param onTokens - Callback for token usage information
+   * @param onToolExecutionStart - Callback when tool execution starts
+   * @param onToolExecutionEnd - Callback when tool execution ends
    * @param customPrompt - Optional custom system prompt
    * @param temperature - Temperature parameter for AI response
    */
@@ -38,6 +40,8 @@ export class ChatService {
     message: string,
     onChunk: (text: string) => void,
     onTokens: (usage: TokenUsage) => void,
+    onToolExecutionStart?: () => void,
+    onToolExecutionEnd?: () => void,
     customPrompt?: string,
     temperature?: number
   ): Promise<void> {
@@ -64,7 +68,7 @@ export class ChatService {
           );
         }
 
-        await this.processStream(response, onChunk, onTokens);
+        await this.processStream(response, onChunk, onTokens, onToolExecutionStart, onToolExecutionEnd);
       } catch (error) {
         clearTimeout(timeoutId);
 
@@ -90,7 +94,9 @@ export class ChatService {
   private async processStream(
     response: Response,
     onChunk: (text: string) => void,
-    onTokens: (usage: TokenUsage) => void
+    onTokens: (usage: TokenUsage) => void,
+    onToolExecutionStart?: () => void,
+    onToolExecutionEnd?: () => void
   ): Promise<void> {
     const reader = response.body?.getReader();
     const decoder = new TextDecoder();
@@ -129,6 +135,15 @@ export class ChatService {
               // Handle token usage events
               if (parsed.type === 'token_usage' && parsed.usage) {
                 onTokens(parsed.usage);
+              }
+
+              // Handle tool execution events
+              if (parsed.type === 'tool_execution_start' && onToolExecutionStart) {
+                onToolExecutionStart();
+              }
+
+              if (parsed.type === 'tool_execution_end' && onToolExecutionEnd) {
+                onToolExecutionEnd();
               }
             } catch (e) {
               console.error('Failed to parse chunk:', e);

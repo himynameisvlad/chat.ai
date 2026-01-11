@@ -8,6 +8,7 @@ import { TokenUsage } from './TokenUsage';
  */
 interface MessageProps {
   message: MessageType;
+  isExecutingTools?: boolean;
 }
 
 /**
@@ -16,7 +17,7 @@ interface MessageProps {
  * Follows Single Responsibility Principle - only renders a message
  */
 
-export function Message({ message }: MessageProps) {
+export function Message({ message, isExecutingTools }: MessageProps) {
   const isUser = message.role === 'user';
 
   return (
@@ -30,16 +31,34 @@ export function Message({ message }: MessageProps) {
       >
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
-        ) : !message.content ? (
-          <LoadingIndicator />
         ) : (
           <>
-            <div className="prose prose-sm max-w-none break-words">
-              <ReactMarkdown>{message.content}</ReactMarkdown>
-            </div>
+            {!message.content && !isExecutingTools ? (
+              <LoadingIndicator />
+            ) : (
+              <>
+                {message.content && (
+                  <div className="prose prose-sm max-w-none break-words">
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  </div>
+                )}
 
-            {/* Token usage display for assistant messages */}
-            {message.tokens && <TokenUsage usage={message.tokens} />}
+                {/* Tool execution loader */}
+                {isExecutingTools && (
+                  <div className="flex items-center space-x-2 mt-2">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                    <span className="text-sm text-gray-600">Executing tools...</span>
+                  </div>
+                )}
+
+                {/* Token usage display for assistant messages */}
+                {message.tokens && <TokenUsage usage={message.tokens} />}
+              </>
+            )}
           </>
         )}
       </div>
