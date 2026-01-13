@@ -2,6 +2,8 @@ import { mcpClientService } from './mcp-client.service';
 import { mcpToolsService } from './mcp-tools.service';
 import { mcpConfigService } from './mcp.config';
 
+console.log('test, ', process.env.DEEPSEEK_API_KEY_TEST);
+
 /**
  * Service responsible for initializing and managing MCP (Model Context Protocol) lifecycle
  */
