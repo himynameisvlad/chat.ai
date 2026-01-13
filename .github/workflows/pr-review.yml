@@ -21,6 +21,10 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
 
+      - name: Fetch base branch
+        run: |
+          git fetch origin ${{ github.event.pull_request.base.ref }}:refs/remotes/origin/${{ github.event.pull_request.base.ref }}
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -59,8 +63,8 @@ jobs:
           MCP_GIT_ENABLED: 'true'
           MCP_RAG_ENABLED: 'true'
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
-          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+          BASE_BRANCH: origin/${{ github.event.pull_request.base.ref }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.sha }}
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: npm run review:pr
