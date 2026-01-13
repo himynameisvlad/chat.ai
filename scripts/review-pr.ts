@@ -160,7 +160,7 @@ async function main() {
 
     // Step 3: Initialize MCP services
     console.log('🔧 Initializing MCP services...');
-    await mcpInitializationService.initializeAll();
+    await mcpInitializationService.initialize();
     console.log('   ✓ MCP services initialized\n');
 
     // Step 4: Create review service
