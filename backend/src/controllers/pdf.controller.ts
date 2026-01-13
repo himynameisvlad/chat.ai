@@ -21,29 +21,15 @@ export class PDFController {
   }
 
   /**
-   * Process PDFs: extract text, chunk, generate embeddings, and store in database
+   * Process documents (PDFs and text files): extract text, chunk, generate embeddings, and store in database
    */
   handleProcessPDFs = async (
-    req: Request<{}, {}, { folder_path?: string }>,
+    req: Request<{}, {}, { folder_path?: string; file_path?: string }>,
     res: Response,
     next: NextFunction
   ): Promise<void> => {
     try {
-      const folderPath = req.body.folder_path || process.env.PDF_FOLDER_PATH || 'pdfs';
-      const absolutePath = path.isAbsolute(folderPath)
-        ? folderPath
-        : path.resolve(process.cwd(), folderPath);
-
-      console.log(`[PDF Processing] Processing PDFs in folder: ${absolutePath}`);
-
-      // Check if folder exists
-      if (!fs.existsSync(absolutePath)) {
-        res.status(404).json({
-          success: false,
-          error: `Folder not found: ${absolutePath}`,
-        });
-        return;
-      }
+      const { file_path, folder_path } = req.body;
 
       // Check if Ollama is available
       const ollamaAvailable = await this.ollamaService.ping();
@@ -57,61 +43,126 @@ export class PDFController {
         return;
       }
 
-      // Read all PDF files in the folder
-      const files = fs.readdirSync(absolutePath);
-      const pdfFiles = files.filter((file) => file.toLowerCase().endsWith('.pdf'));
+      let supportedFiles: { name: string; path: string }[] = [];
 
-      if (pdfFiles.length === 0) {
+      // Process single file if file_path is provided
+      if (file_path) {
+        const absoluteFilePath = path.isAbsolute(file_path)
+          ? file_path
+          : path.resolve(process.cwd(), file_path);
+
+        console.log(`[Document Processing] Processing single file: ${absoluteFilePath}`);
+
+        if (!fs.existsSync(absoluteFilePath)) {
+          res.status(404).json({
+            success: false,
+            error: `File not found: ${absoluteFilePath}`,
+          });
+          return;
+        }
+
+        const ext = path.extname(absoluteFilePath).toLowerCase();
+        if (ext === '.pdf' || ext === '.txt' || ext === '.env' || ext === '.md' || path.basename(absoluteFilePath).startsWith('.env')) {
+          supportedFiles.push({
+            name: path.basename(absoluteFilePath),
+            path: absoluteFilePath,
+          });
+        } else {
+          res.status(400).json({
+            success: false,
+            error: `Unsupported file type: ${ext}. Supported types: .pdf, .txt, .env, .md`,
+          });
+          return;
+        }
+      } else {
+        // Process folder
+        const folderPathValue = folder_path || process.env.PDF_FOLDER_PATH || 'pdfs';
+        const absolutePath = path.isAbsolute(folderPathValue)
+          ? folderPathValue
+          : path.resolve(process.cwd(), folderPathValue);
+
+        console.log(`[Document Processing] Processing documents in folder: ${absolutePath}`);
+
+        // Check if folder exists
+        if (!fs.existsSync(absolutePath)) {
+          res.status(404).json({
+            success: false,
+            error: `Folder not found: ${absolutePath}`,
+          });
+          return;
+        }
+
+        // Read all supported files in the folder (PDFs and text files)
+        const files = fs.readdirSync(absolutePath);
+        supportedFiles = files
+          .filter((file) => {
+            const ext = path.extname(file).toLowerCase();
+            return ext === '.pdf' || ext === '.txt' || ext === '.env' || ext === '.md' || file.startsWith('.env');
+          })
+          .map((file) => ({
+            name: file,
+            path: path.join(absolutePath, file),
+          }));
+      }
+
+      if (supportedFiles.length === 0) {
         res.json({
           success: true,
-          message: `No PDF files found in ${absolutePath}`,
+          message: `No supported files found`,
           results: [],
         });
         return;
       }
 
-      console.log(`[PDF Processing] Found ${pdfFiles.length} PDF file(s)`);
+      console.log(`[Document Processing] Found ${supportedFiles.length} file(s)`);
 
       let totalEmbeddings = 0;
       const results: Array<{ filename: string; status: string; embeddings?: number }> = [];
 
-      for (const pdfFile of pdfFiles) {
+      for (const file of supportedFiles) {
         try {
-          console.log(`[PDF Processing] Processing: ${pdfFile}`);
+          console.log(`[Document Processing] Processing: ${file.name}`);
 
-          // Read PDF file
-          const pdfPath = path.join(absolutePath, pdfFile);
-          const pdfBuffer = fs.readFileSync(pdfPath);
+          const ext = path.extname(file.name).toLowerCase();
+          let text: string;
 
-          // Extract text
-          const pdfContent = await this.pdfParsingService.extractText(pdfBuffer);
-          console.log(`[PDF Processing] Extracted ${pdfContent.pages} pages from ${pdfFile}`);
+          // Extract text based on file type
+          if (ext === '.pdf') {
+            const pdfBuffer = fs.readFileSync(file.path);
+            const pdfContent = await this.pdfParsingService.extractText(pdfBuffer);
+            text = pdfContent.text;
+            console.log(`[Document Processing] Extracted ${pdfContent.pages} pages from ${file.name}`);
+          } else {
+            // For text files (.txt, .env, .md), read directly
+            text = fs.readFileSync(file.path, 'utf-8');
+            console.log(`[Document Processing] Read text file ${file.name}`);
+          }
 
           // Chunk text
-          const chunks = this.chunkingService.chunkText(pdfContent.text, {
+          const chunks = this.chunkingService.chunkText(text, {
             maxTokens: 256,
             overlap: 25,
           });
 
           if (chunks.length === 0) {
             results.push({
-              filename: pdfFile,
+              filename: file.name,
               status: 'No text content found',
             });
             continue;
           }
 
-          console.log(`[PDF Processing] Created ${chunks.length} chunks`);
+          console.log(`[Document Processing] Created ${chunks.length} chunks`);
 
           // Generate embeddings
           const chunkTexts = chunks.map((chunk) => chunk.text);
           const embeddings = await this.ollamaService.generateEmbeddings(chunkTexts);
 
-          console.log(`[PDF Processing] Generated ${embeddings.length} embeddings`);
+          console.log(`[Document Processing] Generated ${embeddings.length} embeddings`);
 
           // Save to database
           const embeddingsToSave = embeddings.map((embedding, index) => ({
-            filename: pdfFile,
+            filename: file.name,
             chunk_index: index,
             chunk_text: chunks[index].text,
             embedding: Array.from(embedding),
@@ -124,17 +175,17 @@ export class PDFController {
 
           totalEmbeddings += embeddings.length;
           results.push({
-            filename: pdfFile,
+            filename: file.name,
             status: 'success',
             embeddings: embeddings.length,
           });
 
-          console.log(`[PDF Processing] Saved embeddings for ${pdfFile}`);
+          console.log(`[Document Processing] Saved embeddings for ${file.name}`);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          console.error(`[PDF Processing] Error processing ${pdfFile}: ${errorMessage}`);
+          console.error(`[Document Processing] Error processing ${file.name}: ${errorMessage}`);
           results.push({
-            filename: pdfFile,
+            filename: file.name,
             status: `error: ${errorMessage}`,
           });
         }
@@ -142,8 +193,8 @@ export class PDFController {
 
       res.json({
         success: true,
-        message: `Processed ${pdfFiles.length} PDF file(s), created ${totalEmbeddings} embeddings`,
-        totalFiles: pdfFiles.length,
+        message: `Processed ${supportedFiles.length} file(s), created ${totalEmbeddings} embeddings`,
+        totalFiles: supportedFiles.length,
         totalEmbeddings,
         results,
       });
