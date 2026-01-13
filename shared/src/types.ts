@@ -34,3 +34,4 @@ export interface SessionTokens {
 }
 
 export * from './constants';
+export * from './types/pr-review.types';
