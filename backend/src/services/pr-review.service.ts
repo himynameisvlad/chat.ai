@@ -8,7 +8,6 @@ import {
   FileChange,
   AnalysisOptions,
 } from '@chat-ai/shared';
-import { RagService } from './rag.service';
 import { mcpToolsService } from './mcp';
 import OpenAI from 'openai';
 
@@ -24,13 +23,10 @@ const DEFAULT_ANALYSIS_OPTIONS: Required<AnalysisOptions> = {
 };
 
 export class PRReviewService {
-  private ragService: RagService;
   private deepseekClient: OpenAI;
   private modelName: string;
 
   constructor() {
-    this.ragService = new RagService();
-
     if (!process.env.DEEPSEEK_API_KEY) {
       throw new Error('DEEPSEEK_API_KEY environment variable is required');
     }
@@ -145,7 +141,7 @@ export class PRReviewService {
     args: Record<string, unknown>
   ): Promise<string> {
     try {
-      const result = await mcpToolsService.executeTool('git-server', toolName, args);
+      const result = await mcpToolsService.executeTool(toolName, args);
 
       if (result.isError) {
         throw new Error(`Git MCP tool error: ${result.content[0]?.text || 'Unknown error'}`);
@@ -204,27 +200,53 @@ export class PRReviewService {
     diff: string,
     options: Required<AnalysisOptions>
   ): Promise<RelevantDoc[]> {
-    console.log('[PR Review] Fetching relevant documentation via RAG');
+    console.log('[PR Review] Fetching relevant documentation via RAG MCP');
 
     try {
       // Generate query based on diff
       const query = this.generateRAGQuery(diff);
 
-      const ragResult = await this.ragService.query(query, {
+      // Call RAG MCP tool
+      const result = await mcpToolsService.executeTool('rag_query', {
+        query,
         topN: options.ragTopN,
         threshold: options.ragThreshold,
       });
 
-      return ragResult.results.map((result) => ({
-        filename: result.filename,
-        section: `Chunk ${result.chunkIndex}`,
-        content: result.text,
-        relevanceScore: result.relevanceScore,
-      }));
+      if (result.isError) {
+        console.warn('[PR Review] RAG MCP returned error:', result.content[0]?.text);
+        return [];
+      }
+
+      // Parse RAG MCP response
+      return this.parseRAGResponse(result.content[0]?.text || '');
     } catch (error) {
-      console.error('[PR Review] RAG query failed:', error);
+      console.error('[PR Review] RAG MCP query failed:', error);
       return [];
     }
+  }
+
+  private parseRAGResponse(ragText: string): RelevantDoc[] {
+    const docs: RelevantDoc[] = [];
+
+    try {
+      // Parse markdown response from RAG MCP server
+      const resultMatches = ragText.matchAll(/## Result (\d+): (.+?)\n\n\*\*Chunk:\*\* (\d+)\n\*\*Relevance Score:\*\* ([\d.]+)[\s\S]*?\n\n([\s\S]*?)(?=\n---|\n## |$)/g);
+
+      for (const match of resultMatches) {
+        const [, , filename, chunkIndex, relevanceScore, content] = match;
+        docs.push({
+          filename: filename.trim(),
+          section: `Chunk ${chunkIndex}`,
+          content: content.trim(),
+          relevanceScore: parseFloat(relevanceScore),
+        });
+      }
+    } catch (error) {
+      console.error('[PR Review] Failed to parse RAG response:', error);
+    }
+
+    return docs;
   }
 
   private generateRAGQuery(diff: string): string {

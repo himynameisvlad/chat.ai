@@ -31,7 +31,8 @@
 │   │     - git_compare_branches  │   │
 │   └─────────────────────────────┘   │
 │   ┌─────────────────────────────┐   │
-│   │  2. RAG Service             │   │
+│   │  2. RAG MCP Server          │   │
+│   │     - rag_query             │   │
 │   │     - Ollama embeddings     │   │
 │   │     - Vector search         │   │
 │   │     - Documentation context │   │
