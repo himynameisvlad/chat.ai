@@ -12,7 +12,10 @@ export class RAGServer extends BaseMCPServer {
   getConfig(): MCPServerConfig | null {
     if (!this.isEnabled()) return null;
 
-    const serverPath = path.join(process.cwd(), 'src/services/mcp/servers/rag-mcp-server.ts');
+    // Try multiple possible paths (for different execution contexts)
+    const serverPath = path.join(process.cwd(), 'backend/src/services/mcp/servers/rag-mcp-server.ts');
+
+    console.log(`[RAG Server] Using path: ${serverPath}`);
 
     return {
       name: this.name,
