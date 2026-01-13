@@ -214,23 +214,39 @@ export class PRReviewService {
     console.log('[PR Review] Fetching relevant documentation via RAG MCP');
 
     try {
-      // Generate query based on diff
-      const query = this.generateRAGQuery(diff);
+      const docs: RelevantDoc[] = [];
 
-      // Call RAG MCP tool
-      const result = await mcpToolsService.executeTool('rag_query', {
-        query,
+      // Query 1: Get context based on code changes
+      const codeQuery = this.generateRAGQuery(diff);
+      const codeResult = await mcpToolsService.executeTool('rag_query', {
+        query: codeQuery,
         topN: options.ragTopN,
         threshold: options.ragThreshold,
       });
 
-      if (result.isError) {
-        console.warn('[PR Review] RAG MCP returned error:', result.content[0]?.text);
-        return [];
+      if (!codeResult.isError) {
+        docs.push(...this.parseRAGResponse(codeResult.content[0]?.text || ''));
       }
 
-      // Parse RAG MCP response
-      return this.parseRAGResponse(result.content[0]?.text || '');
+      // Query 2: Always get .env.example for environment variable validation
+      console.log('[PR Review] Fetching .env.example for env var validation');
+      const envQuery = '.env.example environment variables';
+      const envResult = await mcpToolsService.executeTool('rag_query', {
+        query: envQuery,
+        topN: 2,
+        threshold: 0.3,
+      });
+
+      if (!envResult.isError) {
+        const envDocs = this.parseRAGResponse(envResult.content[0]?.text || '');
+        for (const envDoc of envDocs) {
+          if (envDoc.filename.toLowerCase().includes('.env')) {
+            docs.push(envDoc);
+          }
+        }
+      }
+
+      return docs;
     } catch (error) {
       console.error('[PR Review] RAG MCP query failed:', error);
       return [];
@@ -306,12 +322,17 @@ Focus on:
 - Documentation completeness
 - Test coverage
 - Best practices and design patterns
+- **Environment variables**: Check if any new environment variables (process.env.*) are used in the code but NOT documented in .env.example. This is CRITICAL.
 
 Provide feedback in a structured format:
 1. Summary: Brief overview of the changes
 2. Positive Points: What was done well
 3. Suggestions: Improvements with specific file locations and line numbers where possible
 4. Critical Issues: Serious problems that must be addressed
+
+**IMPORTANT**: If you find any process.env.VARIABLE_NAME used in the code changes:
+1. Check if VARIABLE_NAME exists in the .env.example documentation provided
+2. If NOT found in .env.example, add to CRITICAL issues: "Environment variable VARIABLE_NAME used but not documented in .env.example"
 
 Be constructive, specific, and helpful. Reference the provided documentation when relevant.`;
   }
