@@ -185,14 +185,25 @@ export class PRReviewService {
     compareResult: string,
     filesChanged: number
   ): Omit<PRStatistics, 'reviewDurationMs'> {
-    const linesMatch = compareResult.match(/(\d+) insertions?\(\+\), (\d+) deletions?\(-\)/);
+    // Parse insertions (may or may not be present)
+    const insertionsMatch = compareResult.match(/(\d+) insertions?\(\+\)/);
+    const linesAdded = insertionsMatch ? parseInt(insertionsMatch[1]) : 0;
+
+    // Parse deletions (may or may not be present)
+    const deletionsMatch = compareResult.match(/(\d+) deletions?\(-\)/);
+    const linesDeleted = deletionsMatch ? parseInt(deletionsMatch[1]) : 0;
+
+    // Parse commits count
     const commitsMatch = compareResult.match(/Commits ahead:\*\* (\d+)/);
+    const commitsCount = commitsMatch ? parseInt(commitsMatch[1]) : 0;
+
+    console.log(`[PR Review] Parsed stats: +${linesAdded} -${linesDeleted}, ${commitsCount} commits`);
 
     return {
       filesChanged,
-      linesAdded: linesMatch ? parseInt(linesMatch[1]) : 0,
-      linesDeleted: linesMatch ? parseInt(linesMatch[2]) : 0,
-      commitsCount: commitsMatch ? parseInt(commitsMatch[1]) : 0,
+      linesAdded,
+      linesDeleted,
+      commitsCount,
     };
   }
 
