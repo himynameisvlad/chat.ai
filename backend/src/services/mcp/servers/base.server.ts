@@ -18,6 +18,9 @@ export abstract class BaseMCPServer implements IMCPServer {
   }
 
   protected getEnvBool(key: string): boolean {
-    return process.env[key] === 'true';
+    const value = process.env[key];
+    if (!value) return false;
+    // Support multiple formats: 'true', 'True', 'TRUE', '1', 'yes'
+    return value.toLowerCase() === 'true' || value === '1' || value.toLowerCase() === 'yes';
   }
 }
