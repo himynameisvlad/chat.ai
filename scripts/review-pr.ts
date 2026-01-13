@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 import { PRReviewService } from '../backend/src/services/pr-review.service';
 import { initializeDatabase } from '../backend/src/database/database';
-import { mcpInitializationService } from '../backend/src/services/mcp';
+import { mcpInitializationService, mcpToolsService } from '../backend/src/services/mcp';
 import { Octokit } from '@octokit/rest';
 
 interface PRInfo {
@@ -161,6 +161,19 @@ async function main() {
     // Step 3: Initialize MCP services
     console.log('🔧 Initializing MCP services...');
     await mcpInitializationService.initialize();
+
+    // Check what servers and tools are loaded
+    const connectedServers = mcpInitializationService.getConnectedServers();
+    console.log(`   Connected servers: ${connectedServers.join(', ') || 'none'}`);
+
+    if (!mcpInitializationService.hasTools()) {
+      console.error('   ❌ No MCP tools loaded!');
+      console.error('   Make sure MCP_GIT_ENABLED=true is set');
+      process.exit(1);
+    }
+
+    const tools = mcpToolsService.getTools();
+    console.log(`   Available tools: ${tools.map(t => t.name).join(', ')}`);
     console.log('   ✓ MCP services initialized\n');
 
     // Step 4: Create review service

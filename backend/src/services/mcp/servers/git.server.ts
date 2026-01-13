@@ -12,10 +12,17 @@ export class GitServer extends BaseMCPServer {
   getConfig(): MCPServerConfig | null {
     if (!this.isEnabled()) return null;
 
-    const serverPath = path.join(
-      process.cwd(),
-      'src/services/mcp/servers/git-mcp-server.ts'
-    );
+    // Try multiple possible paths (for different execution contexts)
+    const possiblePaths = [
+      path.join(process.cwd(), 'backend/src/services/mcp/servers/git-mcp-server.ts'), // From project root
+      path.join(process.cwd(), 'src/services/mcp/servers/git-mcp-server.ts'), // From backend dir
+      path.join(__dirname, 'git-mcp-server.ts'), // Relative to this file (compiled)
+    ];
+
+    // Use the first path for now (project root context, which is common in CI)
+    const serverPath = possiblePaths[0];
+
+    console.log(`[Git Server] Using path: ${serverPath}`);
 
     return {
       name: this.name,
