@@ -143,6 +143,12 @@ function formatReviewAsMarkdown(result: any): string {
 async function main() {
   console.log('🚀 Starting PR Review Process...\n');
 
+  // Debug: Show environment variables
+  console.log('🔍 Environment check:');
+  console.log(`   MCP_GIT_ENABLED = "${process.env.MCP_GIT_ENABLED}"`);
+  console.log(`   MCP_RAG_ENABLED = "${process.env.MCP_RAG_ENABLED}"`);
+  console.log(`   DEEPSEEK_API_KEY = ${process.env.DEEPSEEK_API_KEY ? '***SET***' : 'NOT SET'}\n`);
+
   try {
     // Step 1: Get PR information
     console.log('📋 Getting PR information...');

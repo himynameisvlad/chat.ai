@@ -56,8 +56,8 @@ jobs:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           OLLAMA_BASE_URL: http://localhost:11434
           OLLAMA_EMBEDDING_MODEL: nomic-embed-text
-          MCP_GIT_ENABLED: true
-          MCP_RAG_ENABLED: true
+          MCP_GIT_ENABLED: 'true'
+          MCP_RAG_ENABLED: 'true'
           PR_NUMBER: ${{ github.event.pull_request.number }}
           BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
           HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
