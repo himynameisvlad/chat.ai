@@ -14,9 +14,12 @@
     "build": "npm run build --workspaces",
     "build:shared": "npm run build --workspace=@chat-ai/shared",
     "build:backend": "npm run build --workspace=@chat-ai/shared && npm run build --workspace=chat-backend",
-    "build:frontend": "npm run build --workspace=@chat-ai/shared && npm run build --workspace=frontend"
+    "build:frontend": "npm run build --workspace=@chat-ai/shared && npm run build --workspace=frontend",
+    "review:pr": "tsx scripts/review-pr.ts"
   },
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "@octokit/rest": "^20.0.2",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.7.0"
   }
 }
