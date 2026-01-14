@@ -124,12 +124,16 @@ export class MCPClientService {
   }
 
   async callTool(name: string, args: Record<string, any>): Promise<any> {
+    console.log(`[MCP Client] Looking for tool "${name}" in ${this.connections.size} connected servers`);
+
     for (const [serverName, connection] of this.connections.entries()) {
       try {
         const tools = await connection.client.listTools();
+        console.log(`[MCP Client] Server "${serverName}" has ${tools.tools.length} tools:`, tools.tools.map(t => t.name));
         const hasTool = tools.tools.some(t => t.name === name);
 
         if (hasTool) {
+          console.log(`[MCP Client] Found tool "${name}" in server "${serverName}"`);
           const timeout = connection.serverConfig.timeout;
 
           const response = await connection.client.callTool(
@@ -148,6 +152,7 @@ export class MCPClientService {
       }
     }
 
+    console.error(`[MCP Client] Tool "${name}" not found in any of these servers:`, Array.from(this.connections.keys()));
     throw new Error(`Tool "${name}" not found in any connected MCP server`);
   }
 
