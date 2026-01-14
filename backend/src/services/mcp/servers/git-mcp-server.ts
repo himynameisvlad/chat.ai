@@ -7,6 +7,8 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { initializeDatabase } from '../../../database/database';
+import { PRReviewService } from '../../pr-review.service';
 
 const execAsync = promisify(exec);
 
@@ -93,6 +95,66 @@ const tools = [
         },
       },
       required: ['base', 'head'],
+    },
+  },
+  {
+    name: 'review_pr',
+    description: 'Perform AI-powered code review of a pull request. Analyzes code quality, security, performance, documentation, and validates environment variables against .env.example. Returns detailed feedback with suggestions and critical issues.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        baseBranch: {
+          type: 'string',
+          description: 'Base branch to compare against (e.g., "main", "origin/main")',
+        },
+        headBranch: {
+          type: 'string',
+          description: 'Head branch or commit SHA to review (e.g., "feature-branch", "HEAD")',
+        },
+        includeCodeQuality: {
+          type: 'boolean',
+          description: 'Check code quality and maintainability (default: true)',
+        },
+        includeSecurity: {
+          type: 'boolean',
+          description: 'Check for security vulnerabilities (default: true)',
+        },
+        includePerformance: {
+          type: 'boolean',
+          description: 'Check for performance issues (default: true)',
+        },
+        includeDocumentation: {
+          type: 'boolean',
+          description: 'Check documentation completeness (default: true)',
+        },
+        includeTests: {
+          type: 'boolean',
+          description: 'Check test coverage and quality (default: true)',
+        },
+        useRAG: {
+          type: 'boolean',
+          description: 'Use RAG to fetch relevant documentation for context (default: true)',
+        },
+      },
+      required: ['baseBranch', 'headBranch'],
+    },
+  },
+  {
+    name: 'list_active_prs',
+    description: 'List all active pull requests in the repository. Returns PR number, title, status, branches, author, and creation date. Use this to discover open PRs that can be reviewed.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        state: {
+          type: 'string',
+          description: 'Filter by PR state: "open" (default), "closed", "merged", or "all"',
+          enum: ['open', 'closed', 'merged', 'all'],
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of PRs to return (default: 10)',
+        },
+      },
     },
   },
 ];
@@ -338,6 +400,179 @@ ${commits || 'No commits'}
 \`\`\``;
 }
 
+interface ListActivePRsArgs {
+  state?: 'open' | 'closed' | 'merged' | 'all';
+  limit?: number;
+}
+
+async function listActivePRs(args: ListActivePRsArgs = {}): Promise<string> {
+  const { state = 'open', limit = 10 } = args;
+
+  console.error(`[Git MCP] Listing ${state} PRs (limit: ${limit})`);
+
+  try {
+    // Check if gh CLI is available
+    try {
+      await executeGitCommand('gh --version', 5000);
+    } catch (error) {
+      return '❌ GitHub CLI (gh) is not installed or not authenticated.\n\nPlease install: https://cli.github.com/\nThen authenticate: gh auth login';
+    }
+
+    // Get PR list in JSON format
+    const result = await executeGitCommand(
+      `gh pr list --state ${state} --limit ${limit} --json number,title,state,headRefName,baseRefName,author,createdAt,updatedAt,url`,
+      15000
+    );
+
+    const prs = JSON.parse(result.stdout);
+
+    if (!prs || prs.length === 0) {
+      return `ℹ️ No ${state} pull requests found in this repository.`;
+    }
+
+    // Format the PRs as markdown
+    let output = `## ${state.charAt(0).toUpperCase() + state.slice(1)} Pull Requests (${prs.length})\n\n`;
+
+    for (const pr of prs) {
+      const createdDate = new Date(pr.createdAt).toLocaleDateString();
+      const updatedDate = new Date(pr.updatedAt).toLocaleDateString();
+
+      output += `### #${pr.number}: ${pr.title}\n\n`;
+      output += `- **Status:** ${pr.state}\n`;
+      output += `- **Author:** ${pr.author.login}\n`;
+      output += `- **Branches:** \`${pr.baseRefName}\` ← \`${pr.headRefName}\`\n`;
+      output += `- **Created:** ${createdDate}\n`;
+      output += `- **Updated:** ${updatedDate}\n`;
+      output += `- **URL:** ${pr.url}\n`;
+      output += `- **Review Command:** Use \`review_pr\` tool with \`baseBranch: "${pr.baseRefName}"\` and \`headBranch: "${pr.headRefName}"\`\n\n`;
+      output += `---\n\n`;
+    }
+
+    return output;
+  } catch (error) {
+    console.error('[Git MCP] Error listing PRs:', error);
+    return `❌ Error listing PRs: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+interface ReviewPRArgs {
+  baseBranch: string;
+  headBranch: string;
+  includeCodeQuality?: boolean;
+  includeSecurity?: boolean;
+  includePerformance?: boolean;
+  includeDocumentation?: boolean;
+  includeTests?: boolean;
+  useRAG?: boolean;
+}
+
+async function reviewPR(args: ReviewPRArgs): Promise<string> {
+  const {
+    baseBranch,
+    headBranch,
+    includeCodeQuality = true,
+    includeSecurity = true,
+    includePerformance = true,
+    includeDocumentation = true,
+    includeTests = true,
+    useRAG = true,
+  } = args;
+
+  console.error(`[Git MCP] Performing PR review: ${baseBranch}...${headBranch}`);
+
+  // Initialize database
+  await initializeDatabase();
+
+  // Create review service
+  const reviewService = new PRReviewService();
+
+  // Perform review
+  const result = await reviewService.reviewPR({
+    baseBranch,
+    headBranch,
+    analysisOptions: {
+      includeCodeQuality,
+      includeSecurity,
+      includePerformance,
+      includeDocumentation,
+      includeTests,
+      useRAG,
+      ragThreshold: 0.5,
+      ragTopN: 3,
+    },
+  });
+
+  // Format result as markdown
+  let markdown = `# 🤖 AI Code Review\n\n`;
+
+  // Summary
+  markdown += `## Summary\n\n${result.summary}\n\n`;
+
+  // Statistics
+  markdown += `## 📊 Statistics\n\n`;
+  markdown += `- **Files Changed:** ${result.statistics.filesChanged}\n`;
+  markdown += `- **Lines Added:** ${result.statistics.linesAdded}\n`;
+  markdown += `- **Lines Deleted:** ${result.statistics.linesDeleted}\n`;
+  markdown += `- **Commits:** ${result.statistics.commitsCount}\n`;
+  markdown += `- **Review Duration:** ${Math.round(result.statistics.reviewDurationMs / 1000)}s\n\n`;
+
+  // Positive Points
+  if (result.positivePoints && result.positivePoints.length > 0) {
+    markdown += `## ✅ Positive Points\n\n`;
+    result.positivePoints.forEach((point: string) => {
+      markdown += `- ${point}\n`;
+    });
+    markdown += '\n';
+  }
+
+  // Suggestions
+  if (result.suggestions && result.suggestions.length > 0) {
+    markdown += `## 💡 Suggestions\n\n`;
+    result.suggestions.forEach((suggestion: any) => {
+      const location = suggestion.line
+        ? `\`${suggestion.file}:${suggestion.line}\``
+        : `\`${suggestion.file}\``;
+      markdown += `- **${location}** [${suggestion.category}]\n`;
+      markdown += `  ${suggestion.message}\n\n`;
+    });
+  }
+
+  // Critical Issues
+  if (result.criticalIssues && result.criticalIssues.length > 0) {
+    markdown += `## 🔴 Critical Issues\n\n`;
+    result.criticalIssues.forEach((issue: any) => {
+      const location = issue.line
+        ? `\`${issue.file}:${issue.line}\``
+        : `\`${issue.file}\``;
+      markdown += `- **${location}** [${issue.category}]\n`;
+      markdown += `  ${issue.message}\n\n`;
+    });
+  } else {
+    markdown += `## 🟢 No Critical Issues Found\n\n`;
+  }
+
+  // Relevant Documentation
+  if (result.relevantDocumentation && result.relevantDocumentation.length > 0) {
+    markdown += `## 📚 Relevant Documentation\n\n`;
+    result.relevantDocumentation.forEach((doc: any, idx: number) => {
+      markdown += `${idx + 1}. **${doc.filename}** (relevance: ${(doc.relevanceScore * 100).toFixed(1)}%)\n`;
+    });
+    markdown += '\n';
+  }
+
+  // Metadata
+  markdown += `---\n\n`;
+  markdown += `<sub>`;
+  markdown += `🤖 Reviewed by ${result.metadata.model}`;
+  if (result.metadata.ragUsed) {
+    markdown += ` • 📚 RAG-enhanced`;
+  }
+  markdown += ` • ⏱️ ${new Date(result.metadata.timestamp).toLocaleString()}`;
+  markdown += `</sub>\n`;
+
+  return markdown;
+}
+
 const server = new Server(
   {
     name: 'git-server',
@@ -387,6 +622,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           throw new Error('Invalid arguments for git_compare_branches');
         }
         result = await compareBranches(args as unknown as GitCompareBranchesArgs);
+        break;
+      case 'review_pr':
+        if (!args || typeof args !== 'object') {
+          throw new Error('Invalid arguments for review_pr');
+        }
+        result = await reviewPR(args as unknown as ReviewPRArgs);
+        break;
+      case 'list_active_prs':
+        result = await listActivePRs(args as unknown as ListActivePRsArgs);
         break;
       default:
         throw new Error(`Unknown tool: ${name}`);

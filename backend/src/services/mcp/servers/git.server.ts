@@ -1,6 +1,7 @@
 import { BaseMCPServer } from './base.server';
 import { MCPServerConfig } from '../mcp.config';
 import path from 'path';
+import fs from 'fs';
 
 export class GitServer extends BaseMCPServer {
   name = 'git';
@@ -19,8 +20,14 @@ export class GitServer extends BaseMCPServer {
       path.join(__dirname, 'git-mcp-server.ts'), // Relative to this file (compiled)
     ];
 
-    // Use the first path for now (project root context, which is common in CI)
-    const serverPath = possiblePaths[0];
+    // Find the first path that exists
+    let serverPath = possiblePaths[0];
+    for (const possiblePath of possiblePaths) {
+      if (fs.existsSync(possiblePath)) {
+        serverPath = possiblePath;
+        break;
+      }
+    }
 
     console.log(`[Git Server] Using path: ${serverPath}`);
 
