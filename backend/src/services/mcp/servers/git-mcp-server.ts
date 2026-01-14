@@ -586,11 +586,13 @@ const server = new Server(
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
+  console.error('[Git MCP Server] ListTools request received, returning', tools.length, 'tools');
   return { tools };
 });
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
+  console.error(`[Git MCP Server] CallTool request received for "${name}"`);
 
   try {
     let result: string;
@@ -660,9 +662,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 async function main() {
+  console.error('[Git MCP Server] Initializing with', tools.length, 'tools');
+  console.error('[Git MCP Server] Tools:', tools.map(t => t.name).join(', '));
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('Git MCP Server running on stdio');
+  console.error('[Git MCP Server] Successfully connected and running on stdio');
 }
 
 main().catch((error) => {

@@ -212,12 +212,17 @@ export class PRReviewService {
     options: Required<AnalysisOptions>
   ): Promise<RelevantDoc[]> {
     console.log('[PR Review] Fetching relevant documentation via RAG MCP');
+    console.log(`[PR Review] RAG options: topN=${options.ragTopN}, threshold=${options.ragThreshold}`);
 
     try {
       const docs: RelevantDoc[] = [];
+      const seenFilenames = new Set<string>();
 
       // Query 1: Get context based on code changes
+      console.log('[PR Review] Query 1: Code changes context');
       const codeQuery = this.generateRAGQuery(diff);
+      console.log(`[PR Review] Code query: "${codeQuery.substring(0, 100)}..."`);
+
       const codeResult = await mcpToolsService.executeTool('rag_query', {
         query: codeQuery,
         topN: options.ragTopN,
@@ -225,12 +230,21 @@ export class PRReviewService {
       });
 
       if (!codeResult.isError) {
-        docs.push(...this.parseRAGResponse(codeResult.content[0]?.text || ''));
+        const codeDocs = this.parseRAGResponse(codeResult.content[0]?.text || '');
+        console.log(`[PR Review] Found ${codeDocs.length} code-related docs`);
+        for (const doc of codeDocs) {
+          if (!seenFilenames.has(doc.filename)) {
+            docs.push(doc);
+            seenFilenames.add(doc.filename);
+          }
+        }
+      } else {
+        console.warn('[PR Review] Code context query returned error');
       }
 
       // Query 2: Always get .env.example for environment variable validation
-      console.log('[PR Review] Fetching .env.example for env var validation');
-      const envQuery = '.env.example environment variables';
+      console.log('[PR Review] Query 2: .env.example for env var validation');
+      const envQuery = '.env.example environment variables configuration';
       const envResult = await mcpToolsService.executeTool('rag_query', {
         query: envQuery,
         topN: 2,
@@ -239,12 +253,42 @@ export class PRReviewService {
 
       if (!envResult.isError) {
         const envDocs = this.parseRAGResponse(envResult.content[0]?.text || '');
+        console.log(`[PR Review] Found ${envDocs.length} env-related docs`);
         for (const envDoc of envDocs) {
-          if (envDoc.filename.toLowerCase().includes('.env')) {
+          if (envDoc.filename.toLowerCase().includes('.env') && !seenFilenames.has(envDoc.filename)) {
             docs.push(envDoc);
+            seenFilenames.add(envDoc.filename);
           }
         }
+      } else {
+        console.warn('[PR Review] .env.example query returned error');
       }
+
+      // Query 3: Get README and documentation files
+      console.log('[PR Review] Query 3: README and documentation');
+      const readmeQuery = 'README project documentation setup guidelines';
+      const readmeResult = await mcpToolsService.executeTool('rag_query', {
+        query: readmeQuery,
+        topN: 2,
+        threshold: 0.4,
+      });
+
+      if (!readmeResult.isError) {
+        const readmeDocs = this.parseRAGResponse(readmeResult.content[0]?.text || '');
+        console.log(`[PR Review] Found ${readmeDocs.length} README/docs`);
+        for (const doc of readmeDocs) {
+          if ((doc.filename.toLowerCase().includes('readme') || doc.filename.toLowerCase().includes('.md'))
+              && !seenFilenames.has(doc.filename)) {
+            docs.push(doc);
+            seenFilenames.add(doc.filename);
+          }
+        }
+      } else {
+        console.warn('[PR Review] README query returned error');
+      }
+
+      console.log(`[PR Review] Total RAG documents retrieved: ${docs.length}`);
+      console.log(`[PR Review] Document sources: ${docs.map(d => d.filename).join(', ')}`);
 
       return docs;
     } catch (error) {
@@ -277,8 +321,61 @@ export class PRReviewService {
   }
 
   private generateRAGQuery(diff: string): string {
-    const diffLines = diff.split('\n').slice(0, 50).join('\n');
-    return `Code changes and implementation patterns: ${diffLines}`;
+    // Extract key information from diff to create better query
+    const lines = diff.split('\n');
+    const keywords = new Set<string>();
+
+    // Extract file paths
+    for (const line of lines) {
+      if (line.startsWith('+++') || line.startsWith('---')) {
+        const path = line.substring(6).trim();
+        if (path && path !== '/dev/null') {
+          // Get filename without path
+          const filename = path.split('/').pop();
+          if (filename) {
+            keywords.add(filename.replace(/\.(ts|js|tsx|jsx)$/, ''));
+          }
+        }
+      }
+
+      // Extract function/class names from additions
+      if (line.startsWith('+')) {
+        // Match function declarations
+        const funcMatch = line.match(/function\s+(\w+)/);
+        if (funcMatch) keywords.add(funcMatch[1]);
+
+        // Match class declarations
+        const classMatch = line.match(/class\s+(\w+)/);
+        if (classMatch) keywords.add(classMatch[1]);
+
+        // Match const/let declarations (camelCase identifiers)
+        const constMatch = line.match(/(?:const|let|var)\s+([a-z][a-zA-Z0-9]+)/);
+        if (constMatch && constMatch[1].length > 3) keywords.add(constMatch[1]);
+
+        // Match import statements
+        const importMatch = line.match(/import.*from\s+['"](.+)['"]/);
+        if (importMatch) {
+          const module = importMatch[1].split('/').pop()?.replace(/\.(ts|js)$/, '');
+          if (module) keywords.add(module);
+        }
+      }
+    }
+
+    // Limit keywords and create query
+    const topKeywords = Array.from(keywords).slice(0, 10);
+
+    // Get first 200 chars of actual diff content
+    const diffContent = lines
+      .filter(l => l.startsWith('+') || l.startsWith('-'))
+      .slice(0, 5)
+      .join('\n')
+      .substring(0, 200);
+
+    const query = topKeywords.length > 0
+      ? `Code patterns and documentation for: ${topKeywords.join(', ')}. Changes: ${diffContent}`
+      : `Code changes and implementation: ${diffContent}`;
+
+    return query;
   }
 
   private async analyzeWithLLM(
@@ -315,14 +412,28 @@ export class PRReviewService {
   private getSystemPrompt(): string {
     return `You are an expert code reviewer AI. Your task is to analyze pull requests and provide constructive, actionable feedback.
 
+**IMPORTANT: Use the provided documentation**
+You will be provided with relevant documentation from the project's knowledge base. USE this documentation to:
+- Understand the project's architecture and patterns
+- Verify that changes follow established conventions
+- Reference existing guidelines and best practices
+- Check consistency with documented standards
+- Validate environment variables against .env.example
+
 Focus on:
 - Code quality and maintainability
-- Security vulnerabilities
-- Performance considerations
-- Documentation completeness
-- Test coverage
-- Best practices and design patterns
+- Security vulnerabilities (injection, XSS, authentication, authorization)
+- Performance considerations (unnecessary re-renders, memory leaks, N+1 queries)
+- Documentation completeness (comments, README updates, API docs)
+- Test coverage (unit tests, integration tests, edge cases)
+- Best practices and design patterns (as documented in the project)
 - **Environment variables**: Check if any new environment variables (process.env.*) are used in the code but NOT documented in .env.example. This is CRITICAL.
+- **Consistency**: Verify changes align with project documentation and existing patterns
+
+When reviewing:
+1. Reference the provided documentation when relevant
+2. Point out deviations from documented patterns
+3. Suggest improvements based on project guidelines
 
 Provide feedback in a structured format:
 1. Summary: Brief overview of the changes
@@ -345,34 +456,53 @@ Be constructive, specific, and helpful. Reference the provided documentation whe
   ): string {
     let prompt = `Please review this pull request:\n\n`;
 
+    // Show relevant documentation FIRST so LLM sees it before the code
+    if (relevantDocs.length > 0) {
+      prompt += `## 📚 Project Documentation (USE THIS CONTEXT)\n\n`;
+      prompt += `The following documentation was retrieved from the project knowledge base. Use this to validate the changes:\n\n`;
+
+      relevantDocs.forEach((doc, idx) => {
+        prompt += `### Document ${idx + 1}: ${doc.filename}\n`;
+        prompt += `**Relevance:** ${(doc.relevanceScore * 100).toFixed(0)}%\n`;
+        prompt += `**Content:**\n\`\`\`\n${doc.content.slice(0, 800)}\n\`\`\`\n\n`;
+      });
+
+      prompt += `---\n\n`;
+    } else {
+      prompt += `⚠️ **Note:** No project documentation was found in RAG database. Review based on general best practices.\n\n`;
+    }
+
     prompt += `## Changed Files (${changedFiles.length})\n`;
     prompt += changedFiles.map((f) => `- [${f.status}] ${f.path}`).join('\n');
     prompt += '\n\n';
 
-    prompt += `## Diff\n\`\`\`diff\n${diff.slice(0, 8000)}\n\`\`\`\n\n`;
+    prompt += `## Code Changes\n\`\`\`diff\n${diff.slice(0, 8000)}\n\`\`\`\n\n`;
+
+    prompt += `## Analysis Requirements\n`;
+    const focus = [];
+    if (options.includeCodeQuality) focus.push('✅ Code Quality & Maintainability');
+    if (options.includeSecurity) focus.push('🔒 Security Vulnerabilities');
+    if (options.includePerformance) focus.push('⚡ Performance Issues');
+    if (options.includeDocumentation) focus.push('📝 Documentation Completeness');
+    if (options.includeTests) focus.push('🧪 Test Coverage');
+    prompt += focus.map(f => `- ${f}`).join('\n') + '\n\n';
 
     if (relevantDocs.length > 0) {
-      prompt += `## Relevant Documentation\n`;
-      relevantDocs.forEach((doc, idx) => {
-        prompt += `### ${idx + 1}. ${doc.filename} (relevance: ${doc.relevanceScore.toFixed(2)})\n`;
-        prompt += `${doc.content.slice(0, 500)}\n\n`;
-      });
+      prompt += `**Remember:** Reference the provided documentation when reviewing. Check consistency with documented patterns.\n\n`;
     }
 
-    prompt += `## Analysis Focus\n`;
-    const focus = [];
-    if (options.includeCodeQuality) focus.push('Code Quality');
-    if (options.includeSecurity) focus.push('Security');
-    if (options.includePerformance) focus.push('Performance');
-    if (options.includeDocumentation) focus.push('Documentation');
-    if (options.includeTests) focus.push('Tests');
-    prompt += focus.join(', ') + '\n\n';
-
-    prompt += `Please provide your review in the following structure:\n`;
-    prompt += `SUMMARY: [brief overview]\n`;
-    prompt += `POSITIVE: [bullet points of what's good]\n`;
-    prompt += `SUGGESTIONS: [bullet points with file:line references]\n`;
-    prompt += `CRITICAL: [bullet points of serious issues]\n`;
+    prompt += `## Output Format\n`;
+    prompt += `Provide your review in this exact structure:\n\n`;
+    prompt += `SUMMARY: [2-3 sentences describing overall changes and quality]\n\n`;
+    prompt += `POSITIVE:\n`;
+    prompt += `- [What was done well]\n`;
+    prompt += `- [Good practices observed]\n\n`;
+    prompt += `SUGGESTIONS:\n`;
+    prompt += `- path/to/file.ts:123 - [Specific improvement with reasoning]\n`;
+    prompt += `- general - [General suggestion if no specific file]\n\n`;
+    prompt += `CRITICAL:\n`;
+    prompt += `- path/to/file.ts:45 - [Serious issue that must be fixed]\n`;
+    prompt += `- general - [Critical issue if no specific location]\n`;
 
     return prompt;
   }
